@@ -104,7 +104,8 @@ equalized = clahe.apply(gray)
 
 ### モルフォロジー処理
 
-膨張収縮で輪郭をつなげる
+膨張収縮で輪郭をつなげる  
+https://pystyle.info/opencv-morpology-operation/  
 ```
 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
 closed = cv2.morphologyEx(adaptive, cv2.MORPH_CLOSE, kernel, iterations=2)

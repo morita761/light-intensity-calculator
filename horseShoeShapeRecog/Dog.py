@@ -13,14 +13,16 @@ def extract_horseshoe_shape(image):
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     equalized = clahe.apply(gray)
 
-    # 明暗差の影響を軽減し、局所的な境界を強調
+    # 明暗差の影響を軽減し、局所的な境界を強調，適応閾値
     adaptive = cv2.adaptiveThreshold(
         equalized, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-        cv2.THRESH_BINARY_INV, blockSize=13, C=1)
+        cv2.THRESH_BINARY_INV, blockSize=5, C=2)
 
     # モルフォロジー処理（境界である白を膨張→収縮で閉じた輪郭に）
+    # ELLIPSE:近傍は楕円，RECT:長方形，CROSS：十字
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    closed = cv2.morphologyEx(adaptive, cv2.MORPH_CLOSE, kernel, iterations=2)
+    closed = cv2.morphologyEx(adaptive, cv2.MORPH_CLOSE, kernel, iterations=4)
+    # closed = cv2.morphologyEx(closed, cv2.MORPH_OPEN, kernel, iterations=2)
 
 
     # # 輪郭抽出
