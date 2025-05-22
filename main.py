@@ -7,7 +7,7 @@ import matchesTemplate as match
 import brightnessMeasure as bright
 
 if __name__ == "__main__":
-    image = cv2.imread("up_Fz_green_stronger.tif")  # 入力画像を読み込み
+    image = cv2.imread("pic/up_Fz_green_stronger.tif")  # 入力画像を読み込み
     # ウィンドウを作成
     cv2.namedWindow('Sample Image', cv2.WINDOW_NORMAL)
     cv2.namedWindow('Sample Image2', cv2.WINDOW_NORMAL)
