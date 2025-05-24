@@ -29,7 +29,7 @@ class HorseShoeDataset(Dataset):
         image = cv2.imread(mask_path)
         image = cv2.resize(image, self.size)
         # img_tensor = self.transform(image)
-        img_tensor = torch.tensor(filled_mask / 255.0, dtype=torch.float32).unsqueeze(0)
+        img_tensor = torch.tensor(image / 255.0, dtype=torch.float32).unsqueeze(0)
 
         # マスク画像をOpenCVで読み取り
         mask_cv = cv2.imread(mask_path)

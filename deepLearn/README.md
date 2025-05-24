@@ -2,6 +2,7 @@
 ```
 pip install torch torchvision
 pip install matplotlib
+pip install scikit-learn
 ```
 U-Netの学習済みモデル、インストールでこけることあるのか、2023年の記事
 ```

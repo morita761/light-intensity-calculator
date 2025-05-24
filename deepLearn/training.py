@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
 import sys
+from sklearn.model_selection import train_test_split
 
 def visualize_prediction(model, image_path, size=(1254, 624)):
     model.eval()
@@ -32,6 +33,9 @@ def visualize_prediction(model, image_path, size=(1254, 624)):
     plt.title("Predicted Mask")
     plt.show()
 
+image_list = sorted("dataset/images")
+train_files, val_files = train_test_split(image_list, test_size=0.2, random_state=42)
+
 # データ読み込み
 height = 624
 width = 1254
@@ -51,7 +55,8 @@ print(type(optimizer))
 # テスト表示
 img, mask = dataset[0]
 plt.subplot(1, 2, 1)
-plt.imshow(img.permute(1, 2, 0))
+# plt.imshow(img.permute(1, 2, 0))
+plt.imshow(img.squeeze(0))
 plt.title("Image")
 
 plt.subplot(1, 2, 2)
@@ -59,7 +64,7 @@ plt.imshow(mask.squeeze(0), cmap='gray')
 plt.title("Filled Mask")
 plt.show()
 
-sys.exit()
+# sys.exit()
 
 
 # 学習
@@ -88,5 +93,15 @@ for epoch in range(epochs):
 
     print(f"Epoch [{epoch+1}/{epochs}], Loss: {epoch_loss:.4f}")
 
+
+    # # 検証
+    # model.eval()
+    # val_loss = 0
+    # with torch.no_grad():
+    #     for imgs, masks in val_loader:
+    #         ...
+    #         val_loss += criterion(outputs, masks).item()
+
+    # print(f"Epoch {epoch+1} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
 
 visualize_prediction(model,"dataset/images/up_Fz_green_stronger.tif")
