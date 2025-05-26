@@ -10,13 +10,15 @@ def predict_on_test_image(test_image_path, model, patch_size=256, stride=128):
     prob_map = np.zeros((h, w), dtype=np.float32)
     count_map = np.zeros((h, w), dtype=np.float32)
 
+    patch_id = 0
     for y in range(0, h - patch_size + 1, stride):
         for x in range(0, w - patch_size + 1, stride):
             patch = img[y:y+patch_size, x:x+patch_size]
             patch_input = patch[None, ...] / 255.0
             pred = model.predict(patch_input, verbose=0)[0, ..., 0]
             # ~0.0なら予想が背景に偏っている
-            print(f"Epoch {y}: pred.mean() = {np.mean(pred)}")
+            print(f"Epoch {patch_id}: pred.mean() = {np.mean(pred)}")
+            patch_id += 1
 
             prob_map[y:y+patch_size, x:x+patch_size] += pred
             count_map[y:y+patch_size, x:x+patch_size] += 1.0

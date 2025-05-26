@@ -9,9 +9,10 @@ def is_horseshoe_like(cnt):
     # 面積フィルタ
     area = cv2.contourArea(cnt)
     # print(area)
-    if area < 10 or area > 100000:
+    
+    # if area < 10 or area > 100000:
+    if area < 500 or area > 9000:
         return False
-
     # # 楕円近似
     # ellipse = cv2.fitEllipse(cnt)
 
