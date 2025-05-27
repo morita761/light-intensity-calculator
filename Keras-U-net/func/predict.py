@@ -23,15 +23,23 @@ def predict_on_test_image(test_image_path, model, patch_size=256, stride=128):
             prob_map[y:y+patch_size, x:x+patch_size] += pred
             count_map[y:y+patch_size, x:x+patch_size] += 1.0
 
+            # 各パッチヒートマップ保存
             heatmap = (pred * 255).astype(np.uint8)
             heatmap_color = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-            cv2.imwrite("debug_heatmap.png", heatmap_color)
+            cv2.imwrite(f"debug_heatmap_{patch_id}.png", heatmap_color)
 
     # 予想値agv_map
     avg_map = np.divide(prob_map, count_map, out=np.zeros_like(prob_map), where=count_map!=0)
-    result_mask = (avg_map > 0.3).astype(np.uint8) * 255 # 白色で出力
+    result_mask = (avg_map > 0.5).astype(np.uint8) * 255 # 白色で出力
     print("result mask size")
     print(result_mask.shape)
+
+    # 最終ヒートマップ・マスク保存
+    print("avg_map mean:", np.mean(avg_map))
+    print("avg_map max:", np.max(avg_map))
+    heatmap = (avg_map * 255).astype(np.uint8)
+    heatmap_color = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+    cv2.imwrite("avg_heatmap.png", heatmap_color)
 
     cv2.namedWindow('Sample Image', cv2.WINDOW_NORMAL)
     # 読み込んだ画像の高さと幅を取得，整数で割り算

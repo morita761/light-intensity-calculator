@@ -29,10 +29,15 @@ def combined_loss(y_true, y_pred):
 
 # --- 画像とマスク読み込み ---
 # --- ファイルパスの取得 ---
-# image_files = sorted(glob.glob("./simpledataset/images/*"))
-# mask_files = sorted(glob.glob("./simpledataset/masks/*"))
-image_files = sorted(glob.glob("../data/img/*.tif"))
-mask_files = sorted(glob.glob("../data/masks/*_mask.tif"))
+image_files = sorted(glob.glob("./simpledataset/images/*"))
+mask_files = sorted(glob.glob("./simpledataset/masks/*"))
+# image_files = sorted(glob.glob("../data/img/*.tif"))
+# mask_files = sorted(glob.glob("../data/masks/*_mask.tif"))
+# --- ネガティブファイルパスの取得 ---
+neg_image_files = sorted(glob.glob("./simpledataset/neg_img/*"))
+neg_mask_files = sorted(glob.glob("./simpledataset/neg_masks/*"))
+# neg_image_files = sorted(glob.glob("../data/neg_img/*.tif"))
+# neg_mask_files  = sorted(glob.glob("../data/neg_masks/*.tif"))
 predict_image = image_files[0]
 
 assert len(image_files) == len(mask_files), "画像とマスクの数が一致しません"
@@ -75,6 +80,20 @@ for img_path, mask_path in tqdm(zip(image_files, mask_files), total=len(image_fi
         X_all.append(aug_img / 255.0)  # 正規化
         y_all.append(aug_mask[..., None] / 255.0)  # 形状: (H, W, 1) にして正規化
 
+# --- 負例データ（非馬蹄形） ---
+assert len(neg_image_files) == len(neg_mask_files), "負例の画像とマスク数が一致しません"
+
+for img_path, mask_path in tqdm(zip(neg_image_files, neg_mask_files)):
+    img = cv2.imread(img_path)
+    if img is None:
+        raise ValueError(f"画像読み込み失敗: {img_path}")
+    mask = blue.extract_blue_mask(mask_path)
+    X, y = patch.extract_patches(img, mask)
+    for i in range(len(X)):
+        orig_img, orig_mask = X[i], (y[i]*255).astype("uint8").squeeze()
+        aug_img, aug_mask = augment_patch(orig_img, orig_mask)
+        X_all.append(aug_img / 255.0)
+        y_all.append(aug_mask[..., None] / 255.0)  # 青マスクが細いため、しっかり強調する
 
 X_all = np.array(X_all, dtype=np.float32)
 y_all = np.array(y_all, dtype=np.float32)
@@ -92,7 +111,7 @@ model = K.build_unet()
 model.compile(optimizer='adam', loss=combined_loss, metrics=['accuracy'])
 
 # --- EarlyStopping コールバック ---
-early_stop = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)
+early_stop = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
 
 # --- ログファイルパス ---
 log_file_path = Path("logs/pred_mean_log.txt")
@@ -118,7 +137,7 @@ class PrintPredMeanCallback(tf.keras.callbacks.Callback):
 # --- 学習（エポック数増加） ---
 model.fit(X_train, y_train,
           validation_data=(X_val, y_val),
-          epochs=100,
+          epochs=30,
           batch_size=8, # 1回の勾配更新に使うデータ数
           callbacks=[early_stop, PrintPredMeanCallback()])
 
@@ -128,7 +147,7 @@ padded_mask = np.zeros((height, width), dtype=result_mask.dtype)
 h, w = result_mask.shape
 padded_mask[:min(height, h), :min(width, w)] = result_mask[:min(height, h), :min(width, w)]
 
-cv2.imwrite("predicted_mask.png", padded_mask)
+cv2.imwrite("./output/predicted_mask.png", padded_mask)
 
 # --- オーバーレイ出力 ---
 def overlay_mask(image_path, result_mask):
@@ -145,4 +164,4 @@ def overlay_mask(image_path, result_mask):
     blended = cv2.addWeighted(overlay, 0.7, mask_color, 0.3, 0)
     return blended
 
-cv2.imwrite("overlay_debug.png", overlay_mask(predict_image, result_mask))
+cv2.imwrite("./output/overlay_debug.png", overlay_mask(predict_image, result_mask))

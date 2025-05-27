@@ -7,6 +7,13 @@ pip install scikit-learn
 pip install tensorflow
 pip install albumentations
 ```
+```
+pip install opencv-python
+pip install opencv-contrib-python
+pip install torch torchvision
+pip install segmentation-models-pytorch
+pip install pytorch-lightning==1.9.5
+```
 
 # モデルが全ピクセルを背景と予測してしまったときの対策
 1. 損失関数を Dice loss に変えてみる
@@ -133,7 +140,3 @@ wheel                        0.45.1
 wrapt                        1.17.2
 yarl                         1.20.0
 ```
-
-pip install opencv-python==4.10.0.84
-pip install opencv-contrib-python==4.10.0.84
-pip install opencv-python-headless==4.10.0.84
