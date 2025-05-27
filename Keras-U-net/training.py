@@ -29,10 +29,10 @@ def combined_loss(y_true, y_pred):
 
 # --- 画像とマスク読み込み ---
 # --- ファイルパスの取得 ---
-image_files = sorted(glob.glob("./simpledataset/images/*"))
-mask_files = sorted(glob.glob("./simpledataset/masks/*"))
-# image_files = sorted(glob.glob("../data/img/*.tif"))
-# mask_files = sorted(glob.glob("../data/masks/*_mask.tif"))
+# image_files = sorted(glob.glob("./simpledataset/images/*"))
+# mask_files = sorted(glob.glob("./simpledataset/masks/*"))
+image_files = sorted(glob.glob("../data/img/*.tif"))
+mask_files = sorted(glob.glob("../data/masks/*_mask.tif"))
 predict_image = image_files[0]
 
 assert len(image_files) == len(mask_files), "画像とマスクの数が一致しません"
@@ -92,7 +92,7 @@ model = K.build_unet()
 model.compile(optimizer='adam', loss=combined_loss, metrics=['accuracy'])
 
 # --- EarlyStopping コールバック ---
-early_stop = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+early_stop = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)
 
 # --- ログファイルパス ---
 log_file_path = Path("logs/pred_mean_log.txt")
