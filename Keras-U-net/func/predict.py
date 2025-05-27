@@ -26,7 +26,7 @@ def predict_on_test_image(test_image_path, model, patch_size=256, stride=128):
             # 各パッチヒートマップ保存
             heatmap = (pred * 255).astype(np.uint8)
             heatmap_color = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-            cv2.imwrite(f"debug_heatmap_{patch_id}.png", heatmap_color)
+            # cv2.imwrite(f"debug_heatmap_{patch_id}.png", heatmap_color)
 
     # 予想値agv_map
     avg_map = np.divide(prob_map, count_map, out=np.zeros_like(prob_map), where=count_map!=0)

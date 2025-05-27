@@ -11,7 +11,7 @@ def is_horseshoe_like(cnt):
     # print(area)
     
     # if area < 10 or area > 100000:
-    if area < 500 or area > 10000:
+    if area < 100 or area > 20000:
         return False
     # # 楕円近似
     # ellipse = cv2.fitEllipse(cnt)

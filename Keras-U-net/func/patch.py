@@ -31,3 +31,24 @@ def extract_patches(img, mask, patch_size=256, stride=128):
     if len(patches_img) == 0:
         raise ValueError("有効なパッチが抽出できませんでした")
     return np.array(patches_img), np.array(patches_mask)
+
+def extract_neg_patches(img, mask, patch_size=256, stride=128):
+    patches_img, patches_mask = [], []
+    h, w = img.shape[:2]
+
+    # --- 負例ならマスクを完全な背景に置換 ---    
+    mask = np.zeros_like(mask)
+
+    for y in range(0, h - patch_size + 1, stride):
+        for x in range(0, w - patch_size + 1, stride):
+            patch_img = img[y:y+patch_size, x:x+patch_size]
+            patch_mask = mask[y:y+patch_size, x:x+patch_size]
+
+            
+            # --- 負例ならマスクがなくても追加
+            patches_img.append(patch_img)
+            patches_mask.append(patch_mask[..., None])  # すでにゼロなので正規化不要
+
+    print(type(np.array(patches_img)))
+    print(type(np.array(patches_mask)))
+    return np.array(patches_img), np.array(patches_mask)

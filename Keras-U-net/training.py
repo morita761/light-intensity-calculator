@@ -13,6 +13,7 @@ import glob
 from tqdm import tqdm
 import albumentations as A
 from albumentations.augmentations import *
+import matplotlib.pyplot as plt
 
 # --- Dice Loss 定義 ---
 def dice_loss(y_true, y_pred, smooth=1e-6):
@@ -29,24 +30,20 @@ def combined_loss(y_true, y_pred):
 
 # --- 画像とマスク読み込み ---
 # --- ファイルパスの取得 ---
-image_files = sorted(glob.glob("./simpledataset/images/*"))
-mask_files = sorted(glob.glob("./simpledataset/masks/*"))
-# image_files = sorted(glob.glob("../data/img/*.tif"))
-# mask_files = sorted(glob.glob("../data/masks/*_mask.tif"))
+# image_files = sorted(glob.glob("./simpledataset/images/*"))
+# mask_files = sorted(glob.glob("./simpledataset/masks/*"))
+image_files = sorted(glob.glob("../data/img/*.tif"))
+mask_files = sorted(glob.glob("../data/masks/*_mask.tif"))
 # --- ネガティブファイルパスの取得 ---
-neg_image_files = sorted(glob.glob("./simpledataset/neg_img/*"))
-neg_mask_files = sorted(glob.glob("./simpledataset/neg_masks/*"))
-# neg_image_files = sorted(glob.glob("../data/neg_img/*.tif"))
-# neg_mask_files  = sorted(glob.glob("../data/neg_masks/*.tif"))
-predict_image = image_files[0]
+# neg_image_files = sorted(glob.glob("./simpledataset/neg_img/*"))
+# neg_mask_files = sorted(glob.glob("./simpledataset/neg_masks/*"))
+neg_image_files = sorted(glob.glob("../data/neg_img/*.tif"))
+neg_mask_files  = sorted(glob.glob("../data/neg_masks/*.tif"))
+predict_image = image_files[1]
 
 assert len(image_files) == len(mask_files), "画像とマスクの数が一致しません"
 
-# img_file = Path("../data/up_stronger.tif")
-# mask_file = Path("../data/up_stronger_mask.tif")
-
-img = cv2.imread(image_files[0])
-# mask = blue.extract_blue_mask(mask_files[0])
+img = cv2.imread(image_files[2])
 height, width = img.shape[:2]
 
 # --- Albumentations によるデータ拡張関数 ---
@@ -87,11 +84,12 @@ for img_path, mask_path in tqdm(zip(neg_image_files, neg_mask_files)):
     img = cv2.imread(img_path)
     if img is None:
         raise ValueError(f"画像読み込み失敗: {img_path}")
-    mask = blue.extract_blue_mask(mask_path)
-    X, y = patch.extract_patches(img, mask)
+    mask = blue.extract_blue_neg_mask(mask_path)
+    X, y = patch.extract_neg_patches(img, mask)
     for i in range(len(X)):
         orig_img, orig_mask = X[i], (y[i]*255).astype("uint8").squeeze()
         aug_img, aug_mask = augment_patch(orig_img, orig_mask)
+        assert np.all(aug_mask == 0), "負例にゼロ以外のマスクが混入しています"
         X_all.append(aug_img / 255.0)
         y_all.append(aug_mask[..., None] / 255.0)  # 青マスクが細いため、しっかり強調する
 
@@ -103,6 +101,18 @@ print(f"y_all shape: {y_all.shape}")  # → (N, 256, 256, 1)
 
 print("すべての画像・マスクからのパッチ数:", X_all.shape[0])
 
+# def visualize_augmentation(image, mask):
+#     fig, ax = plt.subplots(1, 2, figsize=(8, 4))
+#     ax[0].imshow(image)
+#     ax[0].set_title("Augmented Image")
+#     ax[1].imshow(mask.squeeze(), cmap='gray')
+#     ax[1].set_title("Augmented Mask")
+#     plt.tight_layout()
+#     plt.show()
+
+# # 最初の1枚だけ可視化して確認
+# visualize_augmentation(aug_img, aug_mask)
+
 # --- 訓練/検証分割 ---
 X_train, X_val, y_train, y_val = train_test_split(X_all, y_all, test_size=0.2)
 
@@ -111,7 +121,7 @@ model = K.build_unet()
 model.compile(optimizer='adam', loss=combined_loss, metrics=['accuracy'])
 
 # --- EarlyStopping コールバック ---
-early_stop = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+early_stop = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 
 # --- ログファイルパス ---
 log_file_path = Path("logs/pred_mean_log.txt")
@@ -137,9 +147,11 @@ class PrintPredMeanCallback(tf.keras.callbacks.Callback):
 # --- 学習（エポック数増加） ---
 model.fit(X_train, y_train,
           validation_data=(X_val, y_val),
-          epochs=30,
+          epochs=100,
           batch_size=8, # 1回の勾配更新に使うデータ数
           callbacks=[early_stop, PrintPredMeanCallback()])
+
+model.save("unet_model.h5")
 
 # --- 推論とマスク保存 ---
 result_mask = predict.predict_on_test_image(predict_image, model)
