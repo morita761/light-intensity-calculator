@@ -27,4 +27,7 @@ def extract_patches(img, mask, patch_size=256, stride=128):
     # cv2.waitKey(3*1000)
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
+    
+    if len(patches_img) == 0:
+        raise ValueError("有効なパッチが抽出できませんでした")
     return np.array(patches_img), np.array(patches_mask)
