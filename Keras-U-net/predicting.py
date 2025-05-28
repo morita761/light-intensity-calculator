@@ -13,10 +13,10 @@ from keras.models import load_model
 
 
 # --- ファイルパスの取得 ---
-image_files = sorted(glob.glob("./simpledataset/images/*"))
-mask_files = sorted(glob.glob("./simpledataset/masks/*"))
-# image_files = sorted(glob.glob("../data/img/*.tif"))
-# mask_files = sorted(glob.glob("../data/masks/*_mask.tif"))
+# image_files = sorted(glob.glob("./simpledataset/images/*"))
+# mask_files = sorted(glob.glob("./simpledataset/masks/*"))
+image_files = sorted(glob.glob("../data/img/*.tif"))
+mask_files = sorted(glob.glob("../data/masks/*_mask.tif"))
 predict_image = image_files[1]
 
 assert len(image_files) == len(mask_files), "画像とマスクの数が一致しません"
@@ -42,7 +42,7 @@ model = load_model("unet_model.h5", custom_objects={'combined_loss': combined_lo
 # model = load_model("./test-ver-simple/simple_unet_model.h5", custom_objects={'combined_loss': combined_loss, 'dice_loss': dice_loss})
 
 # --- 推論とマスク保存 ---
-result_mask = predict.predict_on_test_image(predict_image, model, stride=64)
+result_mask = predict.predict_on_test_image(predict_image, model, stride=64, ave_map_threshold=0.3)
 padded_mask = np.zeros((height, width), dtype=result_mask.dtype)
 h, w = result_mask.shape
 padded_mask[:min(height, h), :min(width, w)] = result_mask[:min(height, h), :min(width, w)]

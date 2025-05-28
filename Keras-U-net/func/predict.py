@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import func.padImage as pI
 
-def predict_on_test_image(test_image_path, model, patch_size=256, stride=128):
+def predict_on_test_image(test_image_path, model, patch_size=256, stride=128, ave_map_threshold=0.5):
     img = cv2.imread(test_image_path)
     img = pI.pad_image_to_multiple(img, patch_size)
     h, w = img.shape[:2]
@@ -30,7 +30,7 @@ def predict_on_test_image(test_image_path, model, patch_size=256, stride=128):
 
     # 予想値agv_map
     avg_map = np.divide(prob_map, count_map, out=np.zeros_like(prob_map), where=count_map!=0)
-    result_mask = (avg_map > 0.5).astype(np.uint8) * 255 # 白色で出力
+    result_mask = (avg_map > ave_map_threshold).astype(np.uint8) * 255 # 白色で出力
     print("result mask size")
     print(result_mask.shape)
 
