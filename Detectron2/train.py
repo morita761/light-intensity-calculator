@@ -5,7 +5,8 @@ import os
 
 # データセット登録
 
-register_coco_instances("horseshoe_dataset", {}, "train_annotations.json", "simpledataset/images/")
+# register_coco_instances("horseshoe_dataset", {}, "train_annotations.json", "simpledataset/images/")
+register_coco_instances("horseshoe_dataset", {}, "train_annotations_horseshoe.json", "../data/img/")
 
 cfg = get_cfg()
 cfg.merge_from_file("detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml")

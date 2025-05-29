@@ -55,4 +55,5 @@ def create_coco_annotation(image_path, mask_path, output_json_path):
     with open(output_json_path, "w") as f:
         json.dump(coco_dict, f, indent=4)
 
-create_coco_annotation("simpledataset/images/003.png", "simpledataset/masks/003_mask.png", "train_annotations.json")
+# create_coco_annotation("simpledataset/images/003.png", "simpledataset/masks/003_mask.png", "train_annotations.json")
+create_coco_annotation("../data/img/003.tif", "../data/masks/003_mask.tif", "train_annotations_horseshoe.json")
