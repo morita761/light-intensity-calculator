@@ -6,8 +6,6 @@ pip install matplotlib
 pip install scikit-learn
 pip install tensorflow
 pip install albumentations
-```
-```
 pip install opencv-python
 pip install opencv-contrib-python
 pip install torch torchvision
