@@ -7,6 +7,8 @@ import torch
 import numpy as np
 import pandas as pd
 import os
+import func.splitobje as split
+import sys
 
 # --- Detectron2 設定 ---
 cfg = get_cfg()
@@ -25,15 +27,30 @@ image = cv2.imread("../data/img/003.tif")
 if image is None:
     raise FileNotFoundError("画像が読み込めませんでした")
 
+cv2.namedWindow('Sample Image', cv2.WINDOW_NORMAL)
+# 読み込んだ画像の高さと幅を取得，整数で割り算
+height = image.shape[0] //2
+width = image.shape[1] //2
+
+# ウィンドウサイズを変更，cv2.destroyAllWindows()をするまで使用できる
+cv2.resizeWindow('Sample Image', width, height)
+
+green_mask = split.extract_green_object(image)
+cv2.imshow('Sample Image', green_mask)
+cv2.waitKey(0)
+
+left_mask, right_mask = split.split_left_right(green_mask)
+cv2.imshow('Sample Image', left_mask)
+cv2.waitKey(0) 
+cv2.imshow('Sample Image', right_mask)
 # cv2.imshow('Sample Image',image)
-# cv2.waitKey()
+cv2.waitKey()
+cv2.destroyAllWindows()
 
-# image = image.astype("float32").transpose(2, 0, 1)
-# image = torch.as_tensor(image, dtype=torch.float32)
-
+# sys.exit()
 
 # --- 推論 ---
-outputs = predictor(image)
+outputs = predictor(left_mask)
 
 # 結果保存用リスト
 results = []
@@ -57,20 +74,23 @@ for i, (mask, box) in enumerate(zip(masks, boxes)):
 
     # --- 緑輝度計算
     # --- 緑輝度計算用パッチ座標
-    patch_size = 15
+    green_thresh = 60
+    patch_size = 20
     pad = 2
     left_x1 = x1 + pad
     left_x2 = x1 + patch_size + pad
     right_x1 = x2 - patch_size - pad
     right_x2 = x2 - pad
-    y_patch1 = y2 - patch_size
-    y_patch2 = y2
+    y_patch1 = y2 - patch_size - 2
+    y_patch2 = y2 - 2
     
     # --- パッチ抽出
     left_patch = image[y_patch1:y_patch2, left_x1:left_x2, 1]
     right_patch = image[y_patch1:y_patch2, right_x1:right_x2, 1]
-    left_mean = np.mean(left_patch) if left_patch.size > 0 else 0
-    right_mean = np.mean(right_patch) if right_patch.size > 0 else 0
+
+    # --- 緑輝度計算（しきい値以上のみ） ---
+    left_mean = np.mean(left_patch[left_patch > green_thresh]) if left_patch.size > 0 else 0
+    right_mean = np.mean(right_patch[right_patch > green_thresh]) if right_patch.size > 0 else 0
     
     # --- パッチ領域を矩形で描画
     cv2.rectangle(image, (left_x1, y_patch1), (left_x2, y_patch2), (0, 255, 255), 1)
@@ -94,12 +114,12 @@ for i, (mask, box) in enumerate(zip(masks, boxes)):
 # --- 結果をCSVに保存
 os.makedirs("output", exist_ok=True)
 df = pd.DataFrame(results)
-df.to_csv("output/evaluation_results.csv", index=False)
-print("✅ 結果を output/evaluation_results.csv に保存しました")
+df.to_csv("output/evaluation_results_thresh.csv", index=False)
+print("✅ 結果を output/evaluation_results_thresh.csv に保存しました")
 
 # --- 画像保存
-cv2.imwrite("output/annotated_result_horseshoe_003.png", image)
-print("✅ 評価付き画像を output/annotated_result_horseshoe_003.png に保存しました")
+cv2.imwrite("output/annotated_result_horseshoe_003_thresh.png", image)
+print("✅ 評価付き画像を output/annotated_result_horseshoe_003_thresh.png に保存しました")
 
 
 # --- メタデータ登録 ---
@@ -108,4 +128,4 @@ MetadataCatalog.get("horseshoe_dataset").set(thing_classes=["horseshoe"])
 # --- 可視化と保存 ---
 v = Visualizer(image[:, :, ::-1], MetadataCatalog.get("horseshoe_dataset"), scale=1.2)
 out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
-cv2.imwrite("output/result_horseshoe_003.png", out.get_image()[:, :, ::-1])
+cv2.imwrite("output/result_horseshoe_003_thresh.png", out.get_image()[:, :, ::-1])

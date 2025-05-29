@@ -57,20 +57,23 @@ for i, (mask, box) in enumerate(zip(masks, boxes)):
 
     # --- 緑輝度計算
     # --- 緑輝度計算用パッチ座標
-    patch_size = 15
+    green_thresh = 40
+    patch_size = 20
     pad = 2
     left_x1 = x1 + pad
     left_x2 = x1 + patch_size + pad
     right_x1 = x2 - patch_size - pad
     right_x2 = x2 - pad
-    y_patch1 = y2 - patch_size
-    y_patch2 = y2
+    y_patch1 = y2 - patch_size - 2
+    y_patch2 = y2 - 2
     
     # --- パッチ抽出
     left_patch = image[y_patch1:y_patch2, left_x1:left_x2, 1]
     right_patch = image[y_patch1:y_patch2, right_x1:right_x2, 1]
-    left_mean = np.mean(left_patch) if left_patch.size > 0 else 0
-    right_mean = np.mean(right_patch) if right_patch.size > 0 else 0
+
+    # --- 緑輝度計算（しきい値以上のみ） ---
+    left_mean = np.mean(left_patch[left_patch > green_thresh]) if left_patch.size > 0 else 0
+    right_mean = np.mean(right_patch[right_patch > green_thresh]) if right_patch.size > 0 else 0
     
     # --- パッチ領域を矩形で描画
     cv2.rectangle(image, (left_x1, y_patch1), (left_x2, y_patch2), (0, 255, 255), 1)
@@ -94,12 +97,12 @@ for i, (mask, box) in enumerate(zip(masks, boxes)):
 # --- 結果をCSVに保存
 os.makedirs("output", exist_ok=True)
 df = pd.DataFrame(results)
-df.to_csv("output/evaluation_results.csv", index=False)
-print("✅ 結果を output/evaluation_results.csv に保存しました")
+df.to_csv("output/evaluation_results_thresh.csv", index=False)
+print("✅ 結果を output/evaluation_results_thresh.csv に保存しました")
 
 # --- 画像保存
-cv2.imwrite("output/annotated_result_horseshoe_003.png", image)
-print("✅ 評価付き画像を output/annotated_result_horseshoe_003.png に保存しました")
+cv2.imwrite("output/annotated_result_horseshoe_003_thresh.png", image)
+print("✅ 評価付き画像を output/annotated_result_horseshoe_003_thresh.png に保存しました")
 
 
 # --- メタデータ登録 ---
@@ -108,4 +111,4 @@ MetadataCatalog.get("horseshoe_dataset").set(thing_classes=["horseshoe"])
 # --- 可視化と保存 ---
 v = Visualizer(image[:, :, ::-1], MetadataCatalog.get("horseshoe_dataset"), scale=1.2)
 out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
-cv2.imwrite("output/result_horseshoe_003.png", out.get_image()[:, :, ::-1])
+cv2.imwrite("output/result_horseshoe_003_thresh.png", out.get_image()[:, :, ::-1])

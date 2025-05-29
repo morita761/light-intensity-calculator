@@ -7,6 +7,9 @@ import torch
 import numpy as np
 import pandas as pd
 import os
+import func.splitobje as split
+import func.intensityCalc as calc
+import sys
 
 # --- Detectron2 設定 ---
 cfg = get_cfg()
@@ -20,20 +23,16 @@ cfg.MODEL.DEVICE = "cpu"
 predictor = DefaultPredictor(cfg)
 
 # --- 画像読み込み ---
-# image = cv2.imread("./simpledataset/images/01.png")
 image = cv2.imread("../data/img/003.tif")
 if image is None:
     raise FileNotFoundError("画像が読み込めませんでした")
 
-# cv2.imshow('Sample Image',image)
-# cv2.waitKey()
+green_mask = split.extract_green_object(image)
 
-# image = image.astype("float32").transpose(2, 0, 1)
-# image = torch.as_tensor(image, dtype=torch.float32)
-
+left_mask, right_mask = split.split_left_right(green_mask)
 
 # --- 推論 ---
-outputs = predictor(image)
+outputs = predictor(left_mask)
 
 # 結果保存用リスト
 results = []
@@ -55,51 +54,37 @@ for i, (mask, box) in enumerate(zip(masks, boxes)):
     # --- 面積計算
     area = np.sum(mask)
 
-    # --- 緑輝度計算
-    # --- 緑輝度計算用パッチ座標
-    patch_size = 15
-    pad = 2
-    left_x1 = x1 + pad
-    left_x2 = x1 + patch_size + pad
-    right_x1 = x2 - patch_size - pad
-    right_x2 = x2 - pad
-    y_patch1 = y2 - patch_size
-    y_patch2 = y2
-    
-    # --- パッチ抽出
-    left_patch = image[y_patch1:y_patch2, left_x1:left_x2, 1]
-    right_patch = image[y_patch1:y_patch2, right_x1:right_x2, 1]
-    left_mean = np.mean(left_patch) if left_patch.size > 0 else 0
-    right_mean = np.mean(right_patch) if right_patch.size > 0 else 0
-    
-    # --- パッチ領域を矩形で描画
-    cv2.rectangle(image, (left_x1, y_patch1), (left_x2, y_patch2), (0, 255, 255), 1)
-    cv2.rectangle(image, (right_x1, y_patch1), (right_x2, y_patch2), (0, 255, 255), 1)
+    # 画像からbox領域をトリミング
+    cropped_image = image[y1:y2, x1:x2]
+
+
+    # 緑色ポイントの抽出
+    points, green_mask = calc.extract_green_points(cropped_image)    
+
+    center, direction = calc.perform_pca(points)
+    labels, cluster_centers = calc.perform_kmeans(points)
+    result_img, left_cluster, right_cluster, left_brightness, right_brightness = calc.draw_results(cropped_image, center, direction, cluster_centers)
+    filename = f"000/pca_kmeans_result_{i}.png"
+    cv2.imwrite(filename, result_img)
 
     # --- 結果リストに追加
     results.append({
         "id": i,
         "is_open": is_open,
         "area": area,
-        "left_green": round(left_mean, 1),
-        "right_green": round(right_mean, 1)
+        "left_green": "{:.3f}".format(left_brightness),
+        "right_green": "{:.3f}".format(right_brightness)
     })
-
-    # --- 画像に描画
-    text = f"#{i} Area:{area} Open:{is_open}\nG(L):{left_mean:.1f} G(R):{right_mean:.1f}"
-    cv2.putText(image, text, (x1, max(y1 - 10, 0)), cv2.FONT_HERSHEY_SIMPLEX,
-                0.5, (0, 255, 0), 1, cv2.LINE_AA)
-    cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), 2)
 
 # --- 結果をCSVに保存
 os.makedirs("output", exist_ok=True)
 df = pd.DataFrame(results)
-df.to_csv("output/evaluation_results.csv", index=False)
-print("✅ 結果を output/evaluation_results.csv に保存しました")
+df.to_csv("output/evaluation_results_thresh.csv", index=False)
+print("✅ 結果を output/evaluation_results_thresh.csv に保存しました")
 
 # --- 画像保存
-cv2.imwrite("output/annotated_result_horseshoe_003.png", image)
-print("✅ 評価付き画像を output/annotated_result_horseshoe_003.png に保存しました")
+cv2.imwrite("output/annotated_result_horseshoe_003_thresh.png", image)
+print("✅ 評価付き画像を output/annotated_result_horseshoe_003_thresh.png に保存しました")
 
 
 # --- メタデータ登録 ---
@@ -108,4 +93,6 @@ MetadataCatalog.get("horseshoe_dataset").set(thing_classes=["horseshoe"])
 # --- 可視化と保存 ---
 v = Visualizer(image[:, :, ::-1], MetadataCatalog.get("horseshoe_dataset"), scale=1.2)
 out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
-cv2.imwrite("output/result_horseshoe_003.png", out.get_image()[:, :, ::-1])
+cv2.imwrite("output/result_horseshoe_003_thresh.png", out.get_image()[:, :, ::-1])
+
+cv2.destroyAllWindows()
