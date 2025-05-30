@@ -1,3 +1,5 @@
+from detectron2.utils.visualizer import Visualizer
+import numpy as np
 from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
 from detectron2.utils.visualizer import Visualizer
@@ -10,6 +12,7 @@ import os
 import func.splitobje as split
 import func.intensityCalc as calc
 import sys
+from detectron2.structures import Instances, Boxes, BitMasks
 
 # --- Detectron2 設定 ---
 cfg = get_cfg()
@@ -23,14 +26,14 @@ cfg.MODEL.DEVICE = "cpu"
 predictor = DefaultPredictor(cfg)
 
 # --- 入力ファイル ---
-input_path = "../data/25mosaicfzFz/003.tif"
-direction = "r" # l or r
+input_path = "../data/img/003.tif"
+direction = "merge" # l or r
 
 # --- 入力ファイル名やIDを抽出 ---
 base_name = os.path.splitext(os.path.basename(input_path))[0]  # '003'
 
 # --- 出力ディレクトリの準備 ---
-output_dir = f"./output/25mosaicfzFz/{base_name}/{direction}/"
+output_dir = f"./output/controlFzGFP/{base_name}/{direction}/"
 os.makedirs(output_dir, exist_ok=True)
 if(direction != " "):
     kmeans_dir = f"{output_dir}/kmeans/"
@@ -57,74 +60,42 @@ cv2.waitKey(10*1000)
 
 left_mask, right_mask = split.split_left_right(green_mask)
 
-# --- 推論 ---
-if(direction == "l"):
-    outputs = predictor(left_mask)
-elif(direction == "r"):
-    outputs = predictor(right_mask)
-else:
-    sys.exit()
+# 左右の出力を取得
+outputs_left = predictor(left_mask)
+outputs_right = predictor(right_mask)
 
-# 結果保存用リスト
-results = []
+# 左右のインスタンスを統合（CPUに移して）
+instances_left = outputs_left["instances"].to("cpu")
+instances_right = outputs_right["instances"].to("cpu")
 
-# インスタンス情報を取得
-instances = outputs["instances"].to("cpu")
-masks = instances.pred_masks.numpy()
-boxes = instances.pred_boxes.tensor.numpy()
+# --- 元画像サイズに合わせた統合インスタンス作成
+merged_instances = Instances(image.shape[:2])
 
-for i, (mask, box) in enumerate(zip(masks, boxes)):
-    x1, y1, x2, y2 = box.astype(int)
-    h = mask.shape[0]
+# pred_boxes
+boxes_left = instances_left.pred_boxes.tensor
+boxes_right = instances_right.pred_boxes.tensor
+merged_instances.pred_boxes = Boxes(torch.cat([boxes_left, boxes_right], dim=0))
 
-    # --- 下部開放チェック
-    lower_quarter = mask[int(h * 0.75):, :]
-    cols_with_mask = np.any(lower_quarter, axis=0)
-    is_open = not (cols_with_mask[0] and cols_with_mask[-1])
+# scores
+scores_left = instances_left.scores
+scores_right = instances_right.scores
+merged_instances.scores = torch.cat([scores_left, scores_right], dim=0)
 
-    # --- 面積計算
-    area = np.sum(mask)
-    if area < 100:
-        continue
+# pred_classes
+classes_left = instances_left.pred_classes
+classes_right = instances_right.pred_classes
+merged_instances.pred_classes = torch.cat([classes_left, classes_right], dim=0)
 
-    # 画像からbox領域をトリミング
-    cropped_image = image[y1:y2, x1:x2]
+# pred_masks（必要に応じて）
+if instances_left.has("pred_masks") and instances_right.has("pred_masks"):
+    masks_left = instances_left.pred_masks
+    masks_right = instances_right.pred_masks
+    merged_instances.pred_masks = torch.cat([masks_left, masks_right], dim=0)
 
-
-    # 緑色ポイントの抽出
-    points, green_mask = calc.extract_green_points(cropped_image)    
-
-    center, direction = calc.perform_pca(points)
-    labels, cluster_centers = calc.perform_kmeans(points)
-    result_img, left_cluster, right_cluster, left_brightness, right_brightness = calc.draw_results(cropped_image, center, direction, cluster_centers)
-    filename = f"{kmeans_dir}/pca_kmeans_result_{i}.png"
-    cv2.imwrite(filename, result_img)
-
-    # --- 結果リストに追加
-    results.append({
-        "id": i,
-        "is_open": is_open,
-        "area": area,
-        "left_green": "{:.3f}".format(left_brightness),
-        "right_green": "{:.3f}".format(right_brightness)
-    })
-
-# --- 結果をCSVに保存
-os.makedirs("output", exist_ok=True)
-df = pd.DataFrame(results)
-df.to_csv(csv_path, index=False)
-print(f"✅ 結果を {csv_path} に保存しました")
-
-# --- 画像保存\
-cv2.imwrite(annotated_img_path, image)
-print(f"✅ 評価付き画像を {annotated_img_path} に保存しました")
-
-# --- メタデータ登録 ---
-MetadataCatalog.get("horseshoe_dataset").set(thing_classes=["horseshoe"])
-
-# --- 可視化と保存 ---
+# 可視化
 v = Visualizer(image[:, :, ::-1], MetadataCatalog.get("horseshoe_dataset"), scale=1.2)
-out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
+out = v.draw_instance_predictions(merged_instances)
+# 保存・表示
 cv2.imwrite(visualized_img_path, out.get_image()[:, :, ::-1])
 cv2.imshow("Sample Image", out.get_image()[:, :, ::-1])
 cv2.waitKey(10* 1000)
