@@ -4,6 +4,15 @@
 
 Facebookの物体検出アルゴリズム  
 (https://demura.net/deeplearning/16791.html)  
+
+## 使用方法
+```
+python dataset_preparation.py   # 正解マスクを学習
+python train.py                 # トレーニング
+python inference_split_calc.py  # 馬蹄形を認識して輝度測定
+python inference_merge_split.py # 認識した馬蹄形を画像として保存
+```
+
 python3.11にはまだ対応していないので，3.10にダウングレードする  
 visual studioのC++14もインストールした  
 Lenovoはnvidiaがあったので，Python 3.10 & CUDA 11.8対応PyTorchをinstall  
