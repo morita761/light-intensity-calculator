@@ -1,4 +1,5 @@
 /data
 /Detectron2/detectron2
+*/output/
 .png
 .o
