@@ -161,7 +161,7 @@ for file_name in image_files:
 
     all_horseshoe_masks = []
 
-    # extract_color_maskを使って、馬蹄形輪郭を抽出 (今回は青色を想定)
+    # extract_color_maskを使って、馬蹄形輪郭を抽出
     for color_name in ANNOTATION_COLORS_HSV.keys():
         # 特定の色（インスタンス）のマスクを抽出
         horseshoe_mask = extract_color_mask(green_mask_image, color_name)
