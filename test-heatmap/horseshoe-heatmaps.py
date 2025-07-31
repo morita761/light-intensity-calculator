@@ -136,7 +136,8 @@ def split_left_right(image):
 image_pairs = [
     {'original': '20250404_24%APF_Fz-GFP_loco-vang-Cas9P_001_ue.tif', # マスクなしのオリジナル画像
      'mask': '20250404_24%APF_Fz-GFP_loco-vang-Cas9P_001_ue_mask.tif'}, # アノテーションが描かれたマスク画像
-    {'original':'Fz-RFP_001_green.tif', 'mask': 'Fz-RFP_001_green_mask.tif'}
+    {'original':'Fz-RFP_001_green.tif', 'mask': 'Fz-RFP_001_green_mask.tif'},
+    {'original':'up_stronger.tif', 'mask': 'up_stronger_mask.tif'}
 ]
 
 all_aligned_gfp_data_left = []  # 左側の馬蹄形から得られるGFPデータを格納するリスト
@@ -194,77 +195,109 @@ for file_info in image_pairs:
         # cv2.imshow(f"mask_{color_name}", horseshoe_mask) # デバッグ表示をコメントアウト
         # cv2.waitKey(0)                                  # デバッグ表示をコメントアウト
 
-    # 全てのマスクを結合
-    if all_horseshoe_masks:
-        combined_horseshoe_mask = all_horseshoe_masks[0]
-        for i in range(1, len(all_horseshoe_masks)):
-            combined_horseshoe_mask = cv2.bitwise_or(combined_horseshoe_mask, all_horseshoe_masks[i])
-    else:
-        print(f"警告: {mask_file_name} から輪郭を検出するためのマスクが見つかりませんでした。")
-        continue # この画像ペアの処理をスキップ
-
-    # 結合されたマスクから輪郭を検出
-    contours, _ = cv2.findContours(combined_horseshoe_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    # 緑色チャネルを抽出（輝度測定には**オリジナル画像**を使用）
-    gfp_channel = original_gfp_image_cropped[:, :, 1] 
-
     # 各輪郭を左右に分類し、GFP輝度データを抽出
     valid_horseshoe_count_left = 0
     valid_horseshoe_count_right = 0
 
-    for i, contour in enumerate(contours):
-        if cv2.contourArea(contour) < 20: # 小さすぎるノイズ輪郭を除外 (適宜調整)
+    # all_horseshoe_masks の各マスクをループ
+    for single_horseshoe_mask in all_horseshoe_masks:
+        # 個々のマスクから輪郭を検出
+        contours, _ = cv2.findContours(single_horseshoe_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # このマスクに輪郭がない場合はスキップ
+        if not contours:
+            print(f"警告: {single_horseshoe_mask} から輪郭を検出するためのマスクが見つかりませんでした。")
             continue
 
-        # 輪郭のバウンディングボックスを取得
-        x, y, w, h = cv2.boundingRect(contour)
+        # 緑色チャネルを抽出（輝度測定には**オリジナル画像**を使用）
+        gfp_channel = original_gfp_image_cropped[:, :, 1] 
 
-        # 輪郭の中心X座標
-        threashold = 40 # 中心線からの無視する距離
-        contour_center_x = x + w // 2
+        for i, contour in enumerate(contours):
+            if cv2.contourArea(contour) < 20:
+                continue
+            # 輪郭のバウンディングボックスを取得
+            x, y, w, h = cv2.boundingRect(contour)
 
-        # 中心線に被る輪郭を無視する
-        # 輪郭のバウンディングボックスが中心線をまたぐか、または中心線に近すぎるかをチェック
-        is_overlapping = (x < green_center_x < x + w)
-        if is_overlapping:
-            # 中心線に被る輪郭は無視
-            color = (0, 255, 255) # 黄色 (BGR) for ignored contours
-            cv2.drawContours(debug_img, [contour], -1, color, -1) # debug用に描画したい場合
-            continue # この輪郭はスキップ
-        elif contour_center_x + threashold < green_center_x:
-            # 左側の輪郭
-            current_gfp_data_list = all_aligned_gfp_data_left
-            color = (0, 0, 255) # 赤 (BGR) for debug
-            valid_horseshoe_count_left += 1
-        elif contour_center_x  - threashold > green_center_x:
-            # 右側の輪郭
-            current_gfp_data_list = all_aligned_gfp_data_right
-            color = (255, 0, 0) # 青 (BGR) for debug
-            valid_horseshoe_count_right += 1
-        else:
-            color = (0, 255, 255) # 黄色 (BGR) for ignored contours
-            cv2.drawContours(debug_img, [contour], -1, color, -1) # debug用に描画したい場合
+            # 輪郭の中心X座標
+            threashold = 50 # 中心線からの無視する距離
+            contour_center_x = x + w // 2
 
-        # debug用に輪郭を描画（塗りつぶし）
-        cv2.drawContours(debug_img, [contour], -1, color, -1)
+            # 中心線に被る輪郭を無視する
+            # 輪郭のバウンディングボックスが中心線をまたぐか、または中心線に近すぎるかをチェック
+            is_overlapping = (x < green_center_x < x + w)
+            if is_overlapping:
+                # 中心線に被る輪郭は無視
+                color = (0, 255, 255) # 黄色 (BGR) for ignored contours
+                cv2.drawContours(debug_img, [contour], -1, color, -1) # debug用に描画したい場合
+                continue # この輪郭はスキップ
+            elif contour_center_x + threashold < green_center_x:
+                # 左側の輪郭
+                current_gfp_data_list = all_aligned_gfp_data_left
+                color = (0, 0, 255) # 赤 (BGR) for debug
+                valid_horseshoe_count_left += 1
+            elif contour_center_x  - threashold > green_center_x:
+                # 右側の輪郭
+                current_gfp_data_list = all_aligned_gfp_data_right
+                color = (255, 0, 0) # 青 (BGR) for debug
+                valid_horseshoe_count_right += 1
+            else:
+                color = (0, 255, 255) # 黄色 (BGR) for ignored contours
+                cv2.drawContours(debug_img, [contour], -1, color, -1) # debug用に描画したい場合
+                continue
 
-        # 馬蹄形内部の輝度を抽出するためのマスクを作成
-        contour_mask_local = np.zeros((h, w), dtype=np.uint8)
-        rel_contour = contour - np.array([x, y]) # 相対座標に変換
-        cv2.drawContours(contour_mask_local, [rel_contour], -1, 255, cv2.FILLED)
+            # 最初に描画したマスクから膨張処理を開始
+            temp_mask = np.zeros((h, w), dtype=np.uint8)
+            rel_contour = contour - np.array([x, y])
+            cv2.drawContours(temp_mask, [rel_contour], -1, 255, cv2.FILLED)
+            
+            kernel = np.ones((3, 3), np.uint8)
+            iterations = 0
+            contour_mask_local = temp_mask.copy()
 
-        # 元のGFPチャネル画像（オリジナル画像から抽出）から、このバウンディングボックスに対応する部分を切り出す
-        gfp_roi = gfp_channel[y:y+h, x:x+w]
+            while True:
+                # 占有率を計算
+                total_pixels = w * h
+                white_pixels = cv2.countNonZero(contour_mask_local)
+                occupancy_rate = white_pixels / total_pixels if total_pixels > 0 else 0
+                print(f"Iteration: {iterations}, Occupancy Rate: {occupancy_rate:.2f}")
 
-        # 切り出したGFP輝度データに、作成したローカルマスクを適用
-        masked_gfp_roi = cv2.bitwise_and(gfp_roi, gfp_roi, mask=contour_mask_local)
+                # 占有率が60%を超えるか、試行回数が4回を超えたらループを抜ける
+                if occupancy_rate > 0.60 or iterations >= 4:
+                    if iterations >=1: 
+                        cv2.imshow("ERROR Mask", contour_mask_local)
+                        cv2.waitKey(0)
+                    break
 
-        # リサイズ (target_sizeに統一)
-        resized_gfp = cv2.resize(masked_gfp_roi, target_size, interpolation=cv2.INTER_LINEAR)
-        resized_gfp = np.clip(resized_gfp, 0, 255) # 0-255の範囲にクリップ
+                # 輪郭をさらに膨張させる
+                contour_mask_local = cv2.dilate(contour_mask_local, kernel, iterations=1)
+                iterations += 1
+                
+            
+            if(iterations >2): # 膨張が4のときはスキップする
+                cv2.imshow("skip Mask", contour_mask_local)
+                cv2.waitKey(0)
+                continue
 
-        current_gfp_data_list.append(resized_gfp)
+            # 最終的な輪郭を取得し、debug_imgに描画
+            final_contours, _ = cv2.findContours(contour_mask_local, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if final_contours:
+                # 最初の輪郭（最大のものと仮定）を描画
+                final_absolute_contour = final_contours[0] + np.array([x, y])
+                cv2.drawContours(debug_img, [final_absolute_contour], -1, color, -1)
+    
+            # 元のGFPチャネル画像（オリジナル画像から抽出）から、このバウンディングボックスに対応する部分を切り出す
+            gfp_roi = gfp_channel[y:y+h, x:x+w]
+
+            # 切り出したGFP輝度データに、作成したローカルマスクを適用
+            masked_gfp_roi = cv2.bitwise_and(gfp_roi, gfp_roi, mask=contour_mask_local)
+
+            # リサイズ (target_sizeに統一)
+            resized_gfp = cv2.resize(masked_gfp_roi, target_size, interpolation=cv2.INTER_LINEAR)
+            resized_gfp = np.clip(resized_gfp, 0, 255) # 0-255の範囲にクリップ
+            cv2.imshow("sample1", resized_gfp) # デバッグ表示をコメントアウト
+            cv2.waitKey(0)                   # デバッグ表示をコメントアウト
+
+            current_gfp_data_list.append(resized_gfp)
     
     # cv2.imshow("sample1", debug_img) # デバッグ表示をコメントアウト
     # cv2.waitKey(0)                   # デバッグ表示をコメントアウト
@@ -303,15 +336,6 @@ num_plots = 3
 plt.figure(figsize=(num_plots * 4, 7)) # プロット数に応じて全体のサイズを調整
 
 plot_index = 1
-
-# # オリジナル画像のプロット（切り抜き済み）
-# for i in range(num_image_sets):
-#     # オリジナル画像のプロット (i行目の1列目)
-#     plt.subplot(num_rows_for_display, num_plots, i * num_plots + 1)
-#     plt.imshow(cv2.cvtColor(processed_images_for_plot[i], cv2.COLOR_BGR2RGB))
-#     plt.title(f'Original Image {i+1} \n(Cropped)')
-#     plt.axis('off')
-# plot_index += 1
 
 # # Debug画像のプロット（中心線と分類された輪郭）
 for i in range(num_image_sets):
