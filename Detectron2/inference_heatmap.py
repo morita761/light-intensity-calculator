@@ -141,11 +141,11 @@ def create_average_heatmap(masks, original_image, target_size=(100, 100)):
 cfg = get_cfg()
 cfg.merge_from_file("detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml")
 cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1
-cfg.MODEL.WEIGHTS = "./output/model_final.pth"
+cfg.MODEL.WEIGHTS = "./output/08_RGB_output/model_0019999.pth"
 cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.25
 cfg.MODEL.DEVICE = "cuda"
-# cfg.MODEL.RPN.NMS_THRESH = 0.7
-cfg.MODEL.ROI_HEADS.NMS_THRESH = 0.2
+cfg.MODEL.RPN.NMS_THRESH = 0.7
+# cfg.MODEL.ROI_HEADS.NMS_THRESH = 0.2
 
 # --- 推論器 ---
 predictor = DefaultPredictor(cfg)
