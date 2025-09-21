@@ -2,6 +2,12 @@ from detectron2.engine import DefaultTrainer
 from detectron2.config import get_cfg
 from detectron2.data.datasets import register_coco_instances
 from detectron2.evaluation import COCOEvaluator # 追加
+from detectron2.data import detection_utils as utils
+from detectron2.data import build_detection_train_loader
+from detectron2.data import detection_utils as utils
+from detectron2.data import transforms as T
+import copy
+import torch
 import os
 
 # データセット登録
@@ -14,8 +20,11 @@ cfg = get_cfg()
 # Mask R-CNN R50-FPN
 cfg.merge_from_file("detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml")
 # cfg.MODEL.WEIGHTS = "detectron2://ImageNetPretrained/MSRA/R-50.pkl"
-# cfg.MODEL.WEIGHTS = "detectron2://COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x/137849600/model_final_f1027c.pkl"
-cfg.MODEL.WEIGHTS = "../data/model_final_f10217.pkl" # ダウンロードしたファイルの相対パス
+# cfg.MODEL.WEIGHTS = "detectron2://COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x/137849600/model_final_f1027.pkl"
+cfg.MODEL.WEIGHTS = "../data/model/model_final_f10217.pkl" # ダウンロードしたファイルの相対パス
+
+# cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
+# cfg.MODEL.WEIGHTS = "detectron2://COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x/137849600/model_final_f1027.pkl"
 
 # Mask R-CNN R101-FPN (3x schedule). ResNet-50の代わりに、より深いResNet-101をバックボーンに使用したモデル
 # cfg.merge_from_file("detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_101_FPN_3x.yaml")
@@ -33,12 +42,37 @@ cfg.OUTPUT_DIR = "./output"
 cfg.SOLVER.IMS_PER_BATCH = 2
 cfg.SOLVER.BASE_LR = 0.0001
 # cfg.SOLVER.MAX_ITER = 300
-cfg.SOLVER.MAX_ITER = 5000
+cfg.SOLVER.MAX_ITER = 270000
 cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 128
 cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1  # horseshoe
 cfg.TEST.EVAL_PERIOD = 50 # 50イテレーションごとに評価を実行（任意、デフォルトは0）
 
 os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
+
+def custom_mapper(dataset_dict):
+    import copy
+    dataset_dict = copy.deepcopy(dataset_dict)
+    image = utils.read_image(dataset_dict["file_name"], format="BGR")
+
+    # AugmentationListにしない
+    augmentations = [
+        T.RandomRotation(angle=[-20, 20]),
+        T.RandomFlip(prob=0.5, horizontal=True, vertical=False),
+        T.ResizeShortestEdge([640, 800], max_size=1333),
+    ]
+
+    image, transforms = T.apply_transform_gens(augmentations, image)
+
+    dataset_dict["image"] = torch.as_tensor(image.transpose(2, 0, 1).copy())
+
+    annos = [
+        utils.transform_instance_annotations(obj, transforms, image.shape[:2])
+        for obj in dataset_dict.pop("annotations")
+    ]
+    dataset_dict["instances"] = utils.annotations_to_instances(annos, image.shape[:2])
+    return dataset_dict
+
+
 
 # --- カスタムトレーナーの定義 ---
 # DefaultTrainerを継承し、カスタムデータセット用の評価器を構築します。
@@ -67,8 +101,12 @@ class CustomTrainer(DefaultTrainer):
             f"Please ensure '{dataset_name}' is correctly handled in CustomTrainer.build_evaluator."
         )
     
+    def build_train_loader(cls, cfg):
+        # ここで custom_mapper を指定して学習用データローダーを作成する
+        return build_detection_train_loader(cfg, mapper=custom_mapper)
+    
 if __name__ == "__main__":
     trainer = CustomTrainer(cfg)
     # trainer = DefaultTrainer(cfg)
-    # trainer.resume_or_load(resume=False) # 必要に応じて以前のチェックポイントから再開
+    trainer.resume_or_load(resume=True) # 必要に応じて以前のチェックポイントから再開
     trainer.train() # トレーニングを開始

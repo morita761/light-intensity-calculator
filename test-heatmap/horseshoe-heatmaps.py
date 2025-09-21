@@ -337,7 +337,7 @@ plt.figure(figsize=(num_plots * 4, 7)) # プロット数に応じて全体のサ
 
 plot_index = 1
 
-# # Debug画像のプロット（中心線と分類された輪郭）
+# # Debug画像のプロット
 for i in range(num_image_sets):
     # オリジナル画像のプロット (i行目の1列目)
     plt.subplot(num_rows_for_display, num_plots, i * num_plots + 1)
