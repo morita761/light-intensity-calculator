@@ -14,6 +14,9 @@ def extract_blue_mask(mask_path):
     upper_blue = np.array([130, 255, 255])
     blue_mask = cv2.inRange(hsv, lower_blue, upper_blue)
 
+    cv2.imshow('Sample Image', blue_mask)
+    cv2.waitKey(10*1000)
+
     return blue_mask
 
 def create_coco_annotations(img_dir, mask_dir, output_json_path):
@@ -82,7 +85,13 @@ def create_coco_annotations(img_dir, mask_dir, output_json_path):
 create_coco_annotations(
     img_dir="../data/img",
     mask_dir="../data/masks",
-    output_json_path="train_annotations_horseshoe.json"
+    output_json_path="train_annotations_horseshoe_2.json"
+)
+
+create_coco_annotations(
+    img_dir="../data/img_val",
+    mask_dir="../data/masks_val",
+    output_json_path="val_annotations_horseshoe.json"
 )
 
 # create_coco_annotation("simpledataset/images/003.png", "simpledataset/masks/003_mask.png", "train_annotations.json")

@@ -16,21 +16,25 @@ cfg = get_cfg()
 cfg.merge_from_file("detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml")
 cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1
 cfg.MODEL.WEIGHTS = "./output/model_final.pth"
-cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5
-cfg.MODEL.DEVICE = "cpu"
+cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.3
+# cfg.MODEL.DEVICE = "cpu"
+cfg.MODEL.DEVICE = "cuda"
+cfg.MODEL.RPN.NMS_THRESH = 0.7
+# cfg.MODEL.ROI_HEADS.NMS_THRESH = 1.0
 
 # --- 推論器 ---
 predictor = DefaultPredictor(cfg)
 
 # --- 入力ファイル ---
-input_path = "../data/25mosaicfzFz/003.tif"
+input_path = "../data/img/002.tif"
 direction = "r" # l or r
 
 # --- 入力ファイル名やIDを抽出 ---
 base_name = os.path.splitext(os.path.basename(input_path))[0]  # '003'
 
 # --- 出力ディレクトリの準備 ---
-output_dir = f"./output/25mosaicfzFz/{base_name}/{direction}/"
+# output_dir = f"./output/25mosaicfzFz/{base_name}/{direction}/"
+output_dir = f"./output/test2/{base_name}/{direction}/"
 os.makedirs(output_dir, exist_ok=True)
 if(direction != " "):
     kmeans_dir = f"{output_dir}/kmeans/"
@@ -58,12 +62,13 @@ cv2.waitKey(10*1000)
 left_mask, right_mask = split.split_left_right(green_mask)
 
 # --- 推論 ---
-if(direction == "l"):
-    outputs = predictor(left_mask)
-elif(direction == "r"):
-    outputs = predictor(right_mask)
-else:
-    sys.exit()
+# if(direction == "l"):
+#     outputs = predictor(left_mask)
+# elif(direction == "r"):
+#     outputs = predictor(right_mask)
+# else:
+#     sys.exit()
+outputs = predictor(image)
 
 # 結果保存用リスト
 results = []

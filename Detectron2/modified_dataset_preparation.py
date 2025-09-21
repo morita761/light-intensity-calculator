@@ -45,7 +45,8 @@ def extract_color_mask(mask_image_bgr, color_name):
     return final_mask
 
 def create_coco_annotations(img_dir, mask_dir, output_json_path):
-    image_files = sorted(glob.glob(os.path.join(img_dir, "*.tif")))
+    # image_files = sorted(glob.glob(os.path.join(img_dir, "*.tif")))
+    image_files = sorted(glob.glob(os.path.join(img_dir, "*.png")))
 
     coco_dict = {
         "images": [],
@@ -60,7 +61,8 @@ def create_coco_annotations(img_dir, mask_dir, output_json_path):
     for image_id, image_path in enumerate(image_files):
         file_name = os.path.basename(image_path)
         base_name = os.path.splitext(file_name)[0]
-        mask_path = os.path.join(mask_dir, base_name + "_mask.tif") # アノテーションマスクファイル名
+        # mask_path = os.path.join(mask_dir, base_name + "_mask.tif") # アノテーションマスクファイル名
+        mask_path = os.path.join(mask_dir, base_name + "_mask.png") # アノテーションマスクファイル名
 
         if not os.path.exists(mask_path):
             print(f"⚠️ マスクが見つかりません: {mask_path}")
@@ -87,31 +89,62 @@ def create_coco_annotations(img_dir, mask_dir, output_json_path):
         for color_name in ANNOTATION_COLORS_HSV.keys():
             # 特定の色（インスタンス）のマスクを抽出
             instance_mask = extract_color_mask(annotation_mask_bgr, color_name)
-            cv2.imshow('Sample Image', instance_mask)
-            cv2.waitKey(2*1000)
+            # cv2.imshow('Sample Image', instance_mask)
+            # cv2.waitKey(2*1000)
 
             # 各インスタンスマスクから輪郭を検出
             # RETR_EXTERNAL で外側の輪郭のみを検出（各色の塊ごとに）
             contours, _ = cv2.findContours(instance_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-            for contour in contours:
+            for i, contour in enumerate(contours):
                 segmentation = contour.flatten().tolist()
                 # ポリゴン点が少なすぎる場合は無視（ノイズ対策）
                 if len(segmentation) < 6: # 少なくとも3点必要だが、より厳しく6点以上とすることも
                     continue
-
-                x, y, w, h = cv2.boundingRect(contour)
-                area = cv2.contourArea(contour)
-
-                # 非常に小さい、または大きすぎる領域をフィルタリング
-                # これらの閾値はデータセットによって調整が必要です
-                MIN_AREA_THRESHOLD = 200 # 最小面積（ピクセル）
-                MAX_AREA_THRESHOLD = width * height * 0.9 # 最大面積（画像の90%以上は無視）
-                if area < MIN_AREA_THRESHOLD or area > MAX_AREA_THRESHOLD:
+                if cv2.contourArea(contour) < 20:
                     continue
 
+                x, y, w, h = cv2.boundingRect(contour)
+                # 最初に描画したマスクから膨張処理を開始
+                temp_mask = np.zeros((h, w), dtype=np.uint8)
+                rel_contour = contour - np.array([x, y])
+                cv2.drawContours(temp_mask, [rel_contour], -1, 255, cv2.FILLED)
+                
+                kernel = np.ones((3, 3), np.uint8)
+                iterations = 0
+                contour_mask_local = temp_mask.copy()
+    
+                while True:
+                    # 占有率を計算
+                    total_pixels = w * h
+                    white_pixels = cv2.countNonZero(contour_mask_local)
+                    occupancy_rate = white_pixels / total_pixels if total_pixels > 0 else 0
+                    # print(f"Iteration: {iterations}, Occupancy Rate: {occupancy_rate:.2f}")
+    
+                    # 占有率が60%を超えるか、試行回数が4回を超えたらループを抜ける
+                    if occupancy_rate > 0.60 or iterations >= 4:
+                        # if iterations >=1: 
+                            # cv2.imshow("ERROR Mask", contour_mask_local)
+                            # cv2.waitKey(0)
+                        break
+                    
+                    # 輪郭をさらに膨張させる
+                    contour_mask_local = cv2.dilate(contour_mask_local, kernel, iterations=1)
+                    iterations += 1
+                    
+                
+                if(iterations >2): # 膨張が4のときはスキップする
+                    # cv2.imshow("skip Mask", contour_mask_local)
+                    # cv2.waitKey(0)
+                    continue
                 color = (0, 255, 255) # 黄色 (BGR) for ignored contours
-                cv2.drawContours(annotation_mask_bgr, [contour], -1, color, -1) # debug用に描画したい場合
+                # 最終的な輪郭を取得し、debug_imgに描画
+                final_contours, _ = cv2.findContours(contour_mask_local, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                if final_contours:
+                    # 最初の輪郭（最大のものと仮定）を描画
+                    final_absolute_contour = final_contours[0] + np.array([x, y])
+                    cv2.drawContours(annotation_mask_bgr, [final_absolute_contour], -1, color, -1)
+                    area = cv2.contourArea(final_absolute_contour)
 
                 coco_dict["annotations"].append({
                     "id": annotation_id,

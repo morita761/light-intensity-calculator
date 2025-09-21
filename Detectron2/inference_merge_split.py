@@ -26,14 +26,14 @@ cfg.MODEL.DEVICE = "cpu"
 predictor = DefaultPredictor(cfg)
 
 # --- 入力ファイル ---
-input_path = "../data/img/003.tif"
+input_path = "../data/img/20241106_Fz_24%_003_down.tif"
 direction = "merge" # l or r
 
 # --- 入力ファイル名やIDを抽出 ---
 base_name = os.path.splitext(os.path.basename(input_path))[0]  # '003'
 
 # --- 出力ディレクトリの準備 ---
-output_dir = f"./output/controlFzGFP/{base_name}/{direction}/"
+output_dir = f"./output/test/{base_name}/{direction}/"
 os.makedirs(output_dir, exist_ok=True)
 if(direction != " "):
     kmeans_dir = f"{output_dir}/kmeans/"
@@ -56,7 +56,7 @@ cv2.resizeWindow('Sample Image', width, height)
 
 green_mask = split.extract_green_object(image, coefficient_left=0.10, coefficient_right=0.80, coefficient_bottom=0.9, coefficient_top=0.12)
 cv2.imshow('Sample Image', green_mask)
-cv2.waitKey(10*1000)
+cv2.waitKey(2*1000)
 
 left_mask, right_mask = split.split_left_right(green_mask)
 
@@ -98,7 +98,8 @@ out = v.draw_instance_predictions(merged_instances)
 # 保存・表示
 cv2.imwrite(visualized_img_path, out.get_image()[:, :, ::-1])
 cv2.imshow("Sample Image", out.get_image()[:, :, ::-1])
-cv2.waitKey(10* 1000)
+# cv2.waitKey(10* 1000)
+cv2.waitKey(0)
 print(f"✅ 可視化画像を {visualized_img_path} に保存しました")
 
 cv2.destroyAllWindows()
