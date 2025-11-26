@@ -1,6 +1,7 @@
 /data
 /Detectron2/detectron2
 */output/
-.png
+*/pic/
+*/pics/
 *.tif
 .o
