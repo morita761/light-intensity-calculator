@@ -140,19 +140,19 @@ def create_average_heatmap(masks, original_image, target_size=(100, 100)):
 # --- Detectron2 設定 ---
 cfg = get_cfg()
 cfg.merge_from_file("detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml")
-cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1
-cfg.MODEL.WEIGHTS = "./output/08_RGB_output/model_0019999.pth"
+cfg.MODEL.ROI_HEADS.NUM_CLASSES = 2
+cfg.MODEL.WEIGHTS = "./output/model_0018999.pth"
 cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.25
-cfg.MODEL.DEVICE = "cuda"
-cfg.MODEL.RPN.NMS_THRESH = 0.7
-# cfg.MODEL.ROI_HEADS.NMS_THRESH = 0.2
+cfg.MODEL.DEVICE = "cpu"
+# cfg.MODEL.RPN.NMS_THRESH = 0.7
+cfg.MODEL.ROI_HEADS.NMS_THRESH = 0.2
 
 # --- 推論器 ---
 predictor = DefaultPredictor(cfg)
 
 # 複数の入力ファイルパス
 # input_paths = ["../data/25cas9P/01.tif", "../data/25cas9P/02.tif", "../data/25cas9P/03.tif"] # 実際のファイルパスに置き換えてください
-input_paths = ["../data/img/0031.tif", "../data/img/0041.tif", "../data/img/0042.tif" 
+input_paths = ["./output/004.tif", "./output/6.tif", "./output/003.tif" 
                ] # 実際のファイルパスに置き換えてください
 
 
