@@ -11,17 +11,14 @@ from scipy.stats import ttest_ind
 # data = [df['left_intensity'], df['right_intensity']]
 labels = ['Ventral', 'Dorsal']
 
-# 空白・タブ区切りのファイルを読み込む（複数空白やタブもOK）
-df = pd.read_csv("data.txt", delim_whitespace=True)
 
 # カラム名の確認（スペースを含むカラム名があるので注意）
-print(df.columns)
-df = pd.read_csv("data.txt", delim_whitespace=True, names=["left_intensity", "right_intensity"], skiprows=1)
+df = pd.read_csv("v.csv", delim_whitespace=True, names=["left_intensity", "right_intensity"], skiprows=1)
 data = [df['left_intensity'], df['right_intensity']]
 
 # タイトルを変数として定義
-# plot_title = "Intensity in Ventral R8s (Vg Knowout Cas9P2)"
-plot_title = "Intensity in Dorsal R8s (Vg Knowout Cas9P2)"
+plot_title = "Intensity in Ventral R8s"
+# plot_title = "Intensity in Dorsal R8s"
 # plot_title = "Intensity in Ventral R8s (Control)"
 
 # t検定（独立2群のt検定）
@@ -29,13 +26,19 @@ t_stat, p_val = ttest_ind(df['left_intensity'], df['right_intensity'])
 
 # アスタリスクに変換する関数
 def get_pvalue_asterisk(p):
-    if p < 0.001:
+    if p < 0.00001:  # 0.00001未満
+        print(p)
+        return '*****'
+    elif p < 0.0001: # 0.0001未満
+        print(p)
+        return '****'
+    elif p < 0.001: # 0.001未満
         print(p)
         return '***'
-    elif p < 0.01:
+    elif p < 0.01: # 0.01未満
         print(p)
         return '**'
-    elif p < 0.05:
+    elif p < 0.05: # 0.05未満
         print(p)
         return '*'
     else:
@@ -76,7 +79,7 @@ for flier in box['fliers']:
 
 # 軸の設定
 ax.set_ylabel("Intensity", fontsize=16)
-ax.set_ylim(0, 250)  # y軸を0〜250に設定（必要なら200に）
+ax.set_ylim(0, 100)  # y軸を0〜250に設定（必要なら200に）
 # x軸ラベル（今回は空欄にしているけど入れるならここで）
 # ax.set_xlabel("Condition", fontsize=16)
 
