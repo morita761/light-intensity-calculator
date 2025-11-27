@@ -50,15 +50,26 @@ def split_left_right(image):
 
 # --- メイン処理 ---
 image_pairs = [
-    {'original': './pics/Projections of 241106_Fz_002_second.png', 
+    {'original': './pics/Projections of 241106_Fz_002_second_strong.png', 
      'mask': './pics/Projections of 241106_Fz_002_second_mask.tif'},
-    {'original':'./pics/Projections of 241106_Fz_control003.png', 
+    {'original':'./pics/Projections of 241106_Fz_control003_strong.png', 
      'mask': './pics/Projections of 241106_Fz_control003_mask.tif'},
-    {'original':'./pics/Projections of 20241024_controlFz001.png', 
+    {'original':'./pics/Projections of 20241024_controlFz001_strong.png', 
      'mask': './pics/Projections of 20241024_controlFz001_mask.tif'},
-    {'original':'./pics/Projections of 20241024_controlFz003.png', 
+    {'original':'./pics/Projections of 20241024_controlFz003_strong.png', 
      'mask': './pics/Projections of 20241024_controlFz003_mask.tif'}
 ]
+
+# image_pairs = [
+#     {'original': './pics/vang/Projections of 20250404_24%APF_Fz-GFP_loco-vang-Cas9P_001_ue_strong.png', 
+#      'mask': './pics/vang/Projections of 20250404_24%APF_Fz-GFP_loco-vang-Cas9P_001_ue_mask.tif'},
+#     {'original':'./pics/vang/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_sita_strong.png', 
+#      'mask': './pics/vang/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_sita_mask.tif'},
+#     {'original':'./pics/vang/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_ue_strong.png', 
+#      'mask': './pics/vang/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_ue_mask.tif'},
+#     {'original':'./pics/vang/Projections of 20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P.nd2-20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P_2_strong.png', 
+#      'mask': './pics/vang/Projections of 20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P.nd2-20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P_2_mask.tif'}
+# ]
 
 all_aligned_gfp_data_left = []
 all_aligned_gfp_data_right = []
@@ -68,7 +79,7 @@ debug_images = []
 # ヒートマップのサイズは固定 (100x100) を維持
 target_size = (100, 100) 
 
-for file_info in image_pairs:
+for index, file_info in enumerate(image_pairs):
     original_file_name = file_info['original']
     mask_file_name = file_info['mask']
 
@@ -203,6 +214,15 @@ for file_info in image_pairs:
     debug_images.append(debug_img)
     print(f"'{original_file_name}' から左側の有効な馬蹄形が {valid_horseshoe_count_left} 個、右側の有効な馬蹄形が {valid_horseshoe_count_right} 個検出されました。")
 
+    if(index == 3):
+        # 保存用のヒートマップの表示
+        fig, ax = plt.subplots(1, 1, figsize=(5, 4), constrained_layout=True) # figsizeで図のサイズを指定できます
+        im = ax.imshow(debug_img, cmap='viridis', vmin=0, vmax=255)
+        # 軸の非表示
+        ax.axis('off')
+        # 図の表示
+        plt.show()
+
 
 ### 4. すべての輝度データの平均化とヒートマップの個別出力
 
@@ -227,9 +247,33 @@ if all_aligned_gfp_data_left:
     left_heatmap_colored = cv2.applyColorMap(average_heatmap_left_normalized, cv2.COLORMAP_VIRIDIS)
     cv2.imshow("Heatmap (Left) - Individual Output", left_heatmap_colored)
 
+    # 保存用のヒートマップの表示
+    fig, ax = plt.subplots(1, 1, figsize=(5, 4)) # figsizeで図のサイズを指定できます
+    im = ax.imshow(average_heatmap_left_normalized, cmap='viridis', vmin=0, vmax=255)
+    # カラーバーの追加
+    plt.colorbar(im, ax=ax, label='Normalized Average GFP Intensity')
+    # タイトルの設定
+    ax.set_title('Average GFP Intensity Heatmap \n(Left Horseshoes)')
+    # 軸の非表示
+    ax.axis('off')
+    # 図の表示
+    plt.show()
+
 if all_aligned_gfp_data_right:
     right_heatmap_colored = cv2.applyColorMap(average_heatmap_right_normalized, cv2.COLORMAP_VIRIDIS)
     cv2.imshow("Heatmap (Right) - Individual Output", right_heatmap_colored)
+
+    # 保存用のヒートマップの表示
+    fig, ax = plt.subplots(1, 1, figsize=(5, 4)) # figsizeで図のサイズを指定できます
+    im = ax.imshow(average_heatmap_right_normalized, cmap='viridis', vmin=0, vmax=255)
+    # カラーバーの追加
+    plt.colorbar(im, ax=ax, label='Normalized Average GFP Intensity')
+    # タイトルの設定
+    ax.set_title('Average GFP Intensity Heatmap \n(Left Horseshoes)')
+    # 軸の非表示
+    ax.axis('off')
+    # 図の表示
+    plt.show()
 
 cv2.waitKey(0) 
 cv2.destroyAllWindows()
