@@ -7,12 +7,12 @@ import os
 
 # アノテーションに使用する色のHSV範囲を定義
 ANNOTATION_COLORS_HSV = {
-    "red": {
-        "lower": np.array([0, 100, 100]),
-        "upper": np.array([10, 255, 255]),
-        "lower2": np.array([170, 100, 100]),
-        "upper2": np.array([180, 255, 255])
-    },
+    # "red": {
+    #     "lower": np.array([0, 100, 100]),
+    #     "upper": np.array([10, 255, 255]),
+    #     "lower2": np.array([170, 100, 100]),
+    #     "upper2": np.array([180, 255, 255])
+    # },
     "blue": {
         "lower": np.array([100, 100, 100]),
         "upper": np.array([130, 255, 255])
@@ -49,28 +49,83 @@ def split_left_right(image):
     return image_center_x
 
 # --- メイン処理 ---
+# image_pairs = [
+#     {'original': './pics/control/Projections of 241106_Fz_002_second.png', 
+#      'mask': './pics/control/Projections of 241106_Fz_002_second_mask.tif'},
+#     {'original':'./pics/control/Projections of 241106_Fz_control003.png', 
+#      'mask': './pics/control/Projections of 241106_Fz_control003_mask.tif'},
+#     {'original':'./pics/control/Projections of 20241024_controlFz001.png', 
+#      'mask': './pics/control/Projections of 20241024_controlFz001_mask.tif'},
+#     {'original':'./pics/control/Projections of 20241024_controlFz003.png', 
+#      'mask': './pics/control/Projections of 20241024_controlFz003_mask.tif'}
+# ]
+
 image_pairs = [
-    {'original': './pics/Projections of 241106_Fz_002_second_strong.png', 
-     'mask': './pics/Projections of 241106_Fz_002_second_mask.tif'},
-    {'original':'./pics/Projections of 241106_Fz_control003_strong.png', 
-     'mask': './pics/Projections of 241106_Fz_control003_mask.tif'},
-    {'original':'./pics/Projections of 20241024_controlFz001_strong.png', 
-     'mask': './pics/Projections of 20241024_controlFz001_mask.tif'},
-    {'original':'./pics/Projections of 20241024_controlFz003_strong.png', 
-     'mask': './pics/Projections of 20241024_controlFz003_mask.tif'}
+    {'original': './pics/vang/Projections of 20250404_24%APF_Fz-GFP_loco-vang-Cas9P_001_ue.png', 
+     'mask': './pics/vang/Projections of 20250404_24%APF_Fz-GFP_loco-vang-Cas9P_001_ue_mask.tif'},
+    {'original':'./pics/vang/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_sita.png', 
+     'mask': './pics/vang/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_sita_mask.tif'},
+    {'original':'./pics/vang/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_ue.png', 
+     'mask': './pics/vang/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_ue_mask.tif'},
+    {'original':'./pics/vang/Projections of 20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P.nd2-20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P_2.png', 
+     'mask': './pics/vang/Projections of 20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P.nd2-20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P_2_mask.tif'}
 ]
 
 # image_pairs = [
-#     {'original': './pics/vang/Projections of 20250404_24%APF_Fz-GFP_loco-vang-Cas9P_001_ue_strong.png', 
-#      'mask': './pics/vang/Projections of 20250404_24%APF_Fz-GFP_loco-vang-Cas9P_001_ue_mask.tif'},
-#     {'original':'./pics/vang/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_sita_strong.png', 
-#      'mask': './pics/vang/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_sita_mask.tif'},
-#     {'original':'./pics/vang/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_ue_strong.png', 
-#      'mask': './pics/vang/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_ue_mask.tif'},
-#     {'original':'./pics/vang/Projections of 20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P.nd2-20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P_2_strong.png', 
-#      'mask': './pics/vang/Projections of 20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P.nd2-20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P_2_mask.tif'}
+    # {'original': './pics/mosaic_fz_Fz/20250402_24%APF_Fz-GFP_fz-RNAi_sita_0063/C1-Projections of 20250402_24%APF_Fz-GFP_fz-RNAi_sita_0063.png', 
+    #  'mask': './pics/mosaic_fz_Fz/20250402_24%APF_Fz-GFP_fz-RNAi_sita_0063/Merged_normal.tif'},
+    # {'original':'./pics/mosaic_fz_Fz/20250403_again_24%APF_Fz-GFP_fz-RNAi_sita_0063/C1-Projections of 20250403_again_24%APF_Fz-GFP_fz-RNAi_sita_0063.png', 
+    #  'mask': './pics/mosaic_fz_Fz/20250403_again_24%APF_Fz-GFP_fz-RNAi_sita_0063/Merged_normal.tif'},
 # ]
 
+# image_pairs = [
+#     {'original': './pics/mosaic_control/20250423_24%APF_Fz-GFP_RFP_ue/C1-Projections of 20250423_24%APF_Fz-GFP_RFP_ue.png', 
+#      'mask': './pics/mosaic_control/20250423_24%APF_Fz-GFP_RFP_ue/Merged_rfp.tif'},
+#     {'original':'./pics/mosaic_control/20250428_24%APF_Fz-GFP_sensRFP/C1-Projections of 20250428_24%APF_Fz-GFP_sensRFP.png', 
+#      'mask': './pics/mosaic_control/20250428_24%APF_Fz-GFP_sensRFP/Merged_rfp.tif'},
+# ]
+
+target_size = (100, 100) 
+
+# =========================================================================
+# 【STEP 1】 全体の基準平均輝度 (global_mean_intensity) の計算
+# =========================================================================
+all_raw_gfp_values = [] 
+
+for file_info in image_pairs:
+    original_file_name = file_info['original']
+    mask_file_name = file_info['mask']
+    
+    image_original_for_gfp = cv2.imread(original_file_name)
+    image_mask_for_contours = cv2.imread(mask_file_name)
+    
+    if image_original_for_gfp is None or image_mask_for_contours is None:
+        continue
+        
+    gfp_channel = image_original_for_gfp[:, :, 1]
+    
+    # 全ての色のマスクを結合
+    combined_mask = np.zeros_like(gfp_channel, dtype=np.uint8)
+    for color_name in ANNOTATION_COLORS_HSV.keys():
+        combined_mask = cv2.bitwise_or(combined_mask, extract_color_mask(image_mask_for_contours, color_name))
+    
+    # 結合マスク内のGFP輝度値を取得
+    masked_gfp = cv2.bitwise_and(gfp_channel, gfp_channel, mask=combined_mask)
+    non_zero_gfp = masked_gfp[masked_gfp > 0]
+    
+    all_raw_gfp_values.extend(non_zero_gfp.flatten())
+
+# 全体の基準平均輝度 (Global Mean Intensity) を計算
+if all_raw_gfp_values:
+    global_mean_intensity = np.mean(all_raw_gfp_values) 
+else:
+    global_mean_intensity = 1.0 # データがない場合は0割を防ぐ
+print(f"✅ 全体の基準平均輝度 (Global Mean): {global_mean_intensity:.2f}")
+
+
+# =========================================================================
+# 【STEP 2】 個々の馬蹄形データの抽出と輝度正規化
+# =========================================================================
 all_aligned_gfp_data_left = []
 all_aligned_gfp_data_right = []
 debug_images = []
@@ -92,13 +147,33 @@ for index, file_info in enumerate(image_pairs):
 
     # 2. マスク画像（輪郭検出用）の読み込み
     image_mask_for_contours = cv2.imread(mask_file_name)
-    if image_mask_for_contours is None:
-        print(f"マスク画像を読み込めませんでした: {mask_file_name}。スキップします。")
+    
+    if image_original_for_gfp is None or image_mask_for_contours is None:
+        print(f"画像を読み込めませんでした: {original_file_name} または {mask_file_name}。スキップします。")
         continue
 
     # 左右分割の中心X座標を取得
     image_center_x = split_left_right(image_mask_for_contours)
+    gfp_channel = image_original_for_gfp[:, :, 1] # GFPチャネル（緑）
+    
+    # ---------------------------------------------------------------------
+    # 現在の画像の平均輝度 (current_image_mean_intensity) の計算
+    # ※ STEP 1 のループと同じ処理だが、ここでは輪郭検出に使う combined_mask を再利用
+    combined_mask_for_current_image = np.zeros_like(gfp_channel, dtype=np.uint8)
+    for color_name in ANNOTATION_COLORS_HSV.keys():
+        combined_mask_for_current_image = cv2.bitwise_or(combined_mask_for_current_image, extract_color_mask(image_mask_for_contours, color_name))
+        
+    masked_gfp_for_mean = cv2.bitwise_and(gfp_channel, gfp_channel, mask=combined_mask_for_current_image)
+    current_image_gfp_values = masked_gfp_for_mean[masked_gfp_for_mean > 0]
 
+    if current_image_gfp_values.size > 0:
+        current_image_mean_intensity = np.mean(current_image_gfp_values)
+    else:
+        current_image_mean_intensity = global_mean_intensity # 0割防止
+        
+    scaling_factor = global_mean_intensity / current_image_mean_intensity
+    print(f"   - 画像の平均輝度: {current_image_mean_intensity:.2f}, スケーリングファクター: {scaling_factor:.3f}")
+    # ---------------------------------------------------------------------
     # debug表示用に画像をコピー（輪郭検出用のマスク画像がベース）
     # 【修正3: アノテーション画像の個別出力のベース】
     # マスク画像ではなく、**オリジナル画像**をベースとして、その上にアノテーションの色を重ねる
@@ -202,12 +277,20 @@ for index, file_info in enumerate(image_pairs):
 
             # リサイズ (target_sizeに統一) - ヒートマップの平均化のためにリサイズは必要
             resized_gfp = cv2.resize(masked_gfp_roi, target_size, interpolation=cv2.INTER_LINEAR)
-            resized_gfp = np.clip(resized_gfp, 0, 255).astype(np.uint8) 
-
-            current_gfp_data_list.append(resized_gfp)
-
-    # 【修正3: アノテーション画像の個別出力】
-    # 処理された画像ごとに、アノテーションを赤/青で示した画像を個別に出力
+            
+            # ---------------------------------------------------------------------
+            # 【重要】輝度正規化の適用
+            # D' = D * (I_global_mean / I_current_image_mean)
+            # ---------------------------------------------------------------------
+            resized_gfp_float = resized_gfp.astype(np.float64) 
+            resized_gfp_normalized_float = resized_gfp_float * scaling_factor
+            
+            # 結果を uint8 に戻し、クリッピング
+            # このデータを使って後の平均化を行う
+            resized_gfp_final = np.clip(resized_gfp_normalized_float, 0, 255).astype(np.uint8)
+            
+            current_gfp_data_list.append(resized_gfp_final)
+            
     cv2.imshow(f"Annotated Image: {os.path.basename(original_file_name)}", debug_img)
     cv2.waitKey(1) # 一瞬表示させるため
 
