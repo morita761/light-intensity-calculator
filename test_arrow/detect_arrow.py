@@ -4,11 +4,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import sys
 import os
+import matplotlib.gridspec as gridspec
 
 # 除外する中心線の幅を定義 30ピクセル
-EXCLUSION_WIDTH = 30
+EXCLUSION_WIDTH = 50
 
-# 極座標ヒストグラムのビンの幅
+# 極座標ヒストグラムのビンの幅 (-0.5° ~ 0.5°にするため)
 BIN_NUM = 37
 
 
@@ -101,15 +102,25 @@ def calculate_horseshoe_orientation(contour):
 # ----------------------------------------------------
 
 # --- メイン処理 ---
-image_pairs = [
-    {'original': './pics/R8control/Projections of 20251105_25degree_24hours_senslexAlexOP_loco_cas9_contorl_5degree_24hours_senslexAlexOP_loco_cas9_contorl_rot.tif', 
-     'mask': './pics/R8control/Projections of 20251105_25degree_24hours_senslexAlexOP_loco_cas9_contorl_5degree_24hours_senslexAlexOP_loco_cas9_contorl_rot_detection.tif'},
-]
-
 # image_pairs = [
-#     {'original': './pics/R8ori/Projections of 20251105_25degree_24hours_senslexAlexOP_loco_vang_cas9001.nd2...5degree_24hours_senslexAlexOP_loco_vang_cas9001.png', 
-#      'mask': './pics/R8ori/Projections of 20251105_25degree_24hours_senslexAlexOP_loco_vang_cas9001.nd2...5degree_24hours_senslexAlexOP_loco_vang_cas9001_detection.tif'},
+#     {'original': './pics/R8control/Projections of 20251105_25degree_24hours_senslexAlexOP_loco_cas9_contorl.nd2...5degree_24hours_senslexAlexOP_loco_cas9_contorl_r_image.png', 
+#      'mask': './pics/R8control/Projections of 20251105_25degree_24hours_senslexAlexOP_loco_cas9_contorl.nd2...5degree_24hours_senslexAlexOP_loco_cas9_contorl_r_image_mask.tif'},
+#     {'original': './pics/R8control/Projections of 20251119_25d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi.nd2...5d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi_h.png', 
+#      'mask': './pics/R8control/Projections of 20251119_25d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi.nd2...5d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi_h_mask.tif'},
+#     {'original': './pics/R8control/Projections of 20251119_25d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi.nd2...5d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi_r_h.png', 
+#      'mask': './pics/R8control/Projections of 20251119_25d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi.nd2...5d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi_r_h_mask.tif'},
 # ]
+
+image_pairs = [
+    {'original': './pics/R8ori/Projections of 20251105_25degree_24hours_senslexAlexOP_loco_vang_cas9001.nd2...5degree_24hours_senslexAlexOP_loco_vang_cas9001.png', 
+     'mask': './pics/R8ori/Projections of 20251105_25degree_24hours_senslexAlexOP_loco_vang_cas9001.nd2...5degree_24hours_senslexAlexOP_loco_vang_cas9001_mask.tif'},
+    {'original': './pics/R8ori/Projections of 20251119_25d_22h_senslexAlexOPmCherry_loco--vang-cas9002.nd2-...25d_22h_senslexAlexOPmCherry_loco--vang-cas9002.png', 
+     'mask': './pics/R8ori/Projections of 20251119_25d_22h_senslexAlexOPmCherry_loco--vang-cas9002.nd2-...25d_22h_senslexAlexOPmCherry_loco--vang-cas9002_mask.tif'},
+    {'original': './pics/R8ori/Projections of 20251129_25d_22h_senslexAlexOPmCherry_loco_vang_cas9.nd2-20251129_25d_22h_senslexAlexOPmCherry_loco_vang_cas9.png', 
+     'mask': './pics/R8ori/Projections of 20251129_25d_22h_senslexAlexOPmCherry_loco_vang_cas9.nd2-20251129_25d_22h_senslexAlexOPmCherry_loco_vang_cas9_mask.tif'},
+    {'original': './pics/R8ori/Projections of 20251129_25d_22h_test_sensmCherry_loco_vang_cas9001.nd2-20251129_25d_22h_test_sensmCherry_loco_vang_cas9001.png', 
+     'mask': './pics/R8ori/Projections of 20251129_25d_22h_test_sensmCherry_loco_vang_cas9001.nd2-20251129_25d_22h_test_sensmCherry_loco_vang_cas9001_mask.tif'},
+]
 
 debug_images = []
 left_horseshoe_angles = []
@@ -168,7 +179,7 @@ for index, file_info in enumerate(image_pairs):
             side_label = ""
             if contour_center_x + EXCLUSION_WIDTH < image_center_x:
                 # 左側の輪郭
-                color = (0, 0, 255) # 赤 (BGR) for debug
+                color = (255, 0, 255) # マゼンタ (BGR) for debug
                 valid_horseshoe_count_left += 1
                 current_angle_list = left_horseshoe_angles
                 side_label = "Left"
@@ -271,7 +282,7 @@ cv2.destroyAllWindows()
 # ----------------------------------------------------
 ## 🐎 個別馬蹄形デバッグ表示
 # ----------------------------------------------------
-# individual_debug_plots = [] # debugを省略：使用するときはこれをコメントアウト
+individual_debug_plots = [] # debugを省略：使用するときはこれをコメントアウト
 if individual_debug_plots:
     # 10個ごとに新しいウィンドウを作成して表示
     plots_per_figure = 10
@@ -308,14 +319,45 @@ num_plots = 3
 num_image_sets = len(image_pairs) 
 num_rows_for_display = num_image_sets if num_image_sets > 0 else 1 
 
-plt.figure(figsize=(num_plots * 4, 7))
+fig = plt.figure(figsize=(num_plots * 4, 4))
 
-# Debug画像のプロット
-for i in range(num_image_sets):
-    plt.subplot(num_rows_for_display, num_plots, i * num_plots + 1)
-    plt.imshow(cv2.cvtColor(debug_images[i], cv2.COLOR_BGR2RGB))
-    plt.title(f'Annotated Image {i+1}')
-    plt.axis('off')
+rows_inner = 2
+cols_inner = 2
+num_debug_images = len(debug_images)
+
+if num_debug_images >= 4:
+    # ----------------------------------------------------
+    # 2. 外側の GridSpec を定義 (図全体を1行 num_plots列に分割)
+    # これが「三分割したうち」のベースとなるグリッドです。
+    gs_outer = gridspec.GridSpec(1, num_plots, figure=fig)
+    # ----------------------------------------------------
+
+    # ----------------------------------------------------
+    # 3. 1区画目 (左端: gs_outer[0, 0]) の中に、内側の GridSpec (2行2列) をネストして定義
+    gs_inner = gridspec.GridSpecFromSubplotSpec(rows_inner, cols_inner, 
+                                                subplot_spec=gs_outer[0, 0],
+                                                wspace=0.1, hspace=0.1) # 余白の調整
+    # ----------------------------------------------------
+
+    # 4. 2x2 の各セルにデバッグ画像をプロット
+    for i in range(num_debug_images):
+        if(i>=4):
+            break
+        if i < rows_inner * cols_inner:
+            # fig.add_subplot(gs_inner[i]) で、内側のグリッドのセルを指定
+            ax = fig.add_subplot(gs_inner[i])
+
+            # 画像表示処理 (元のコードを踏襲)
+            ax.imshow(cv2.cvtColor(debug_images[i], cv2.COLOR_BGR2RGB))
+            ax.set_title(f'Annotated {i+1}', fontsize=10) # タイトルを小さくする
+            ax.axis('off')
+else:
+    # Debug画像のプロット
+    for i in range(num_image_sets):
+        plt.subplot(num_rows_for_display, num_plots, i * num_plots + 1)
+        plt.imshow(cv2.cvtColor(debug_images[i], cv2.COLOR_BGR2RGB))
+        plt.title(f'Annotated Image {i+1}')
+        plt.axis('off')
 
 # 左側の極座標ヒストグラム
 ax_left = plt.subplot(1, num_plots, 2, projection='polar')
@@ -326,14 +368,15 @@ if left_horseshoe_angles:
     centers = (bin_edges[:-1] + bin_edges[1:]) / 2
     width = np.diff(bin_edges)
     
-    bars = ax_left.bar(centers, counts, width=width, color='red', alpha=0.6, bottom=0)
+    bars = ax_left.bar(centers, counts, width=width, color='magenta', alpha=0.6, bottom=0)
     
     ax_left.set_theta_zero_location("S") 
     ax_left.set_rlim(0, max(counts) * 1.1 if counts.size > 0 else 1)
     
     ax_left.set_xticks(np.radians([0, 90, 180, 270]))
     ax_left.set_xticklabels(['0°', '90°', '180°', ' -90°'])
-    ax_left.set_title('Orientation Polar Histogram (Left)', va='bottom')
+    ax_left .set_rlabel_position(135)
+    ax_left.set_title('Orientation Polar Histogram (Ventral)', va='bottom')
 else:
     ax_left.text(0, 0, 'No data', ha='center', va='center', transform=ax_left.transAxes)
 
@@ -353,7 +396,8 @@ if right_horseshoe_angles:
     
     ax_right.set_xticks(np.radians([0, 90, 180, 270]))
     ax_right.set_xticklabels(['0°', '90°', '180°', ' -90°'])
-    ax_right.set_title('Orientation Polar Histogram (Right)', va='bottom')
+    ax_right.set_rlabel_position(135)
+    ax_right.set_title('Orientation Polar Histogram (Dorsal)', va='bottom')
 else:
     ax_right.text(0, 0, 'No data', ha='center', va='center', transform=ax_right.transAxes)
 
