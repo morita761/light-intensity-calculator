@@ -4,6 +4,13 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import sys
 import os
+import matplotlib.gridspec as gridspec
+
+# 除外する中心線の幅を定義 30ピクセル
+EXCLUSION_WIDTH = 50
+
+# デバックフラグ (on: 1, off: 0)
+DEBUG_FLAG = 0
 
 # アノテーションに使用する色のHSV範囲を定義
 ANNOTATION_COLORS_HSV = {
@@ -297,7 +304,7 @@ for index, file_info in enumerate(image_pairs):
     debug_images.append(debug_img)
     print(f"'{original_file_name}' から左側の有効な馬蹄形が {valid_horseshoe_count_left} 個、右側の有効な馬蹄形が {valid_horseshoe_count_right} 個検出されました。")
 
-    if(index == 3):
+    if(index == 3 & DEBUG_FLAG == 1):
         # 保存用のヒートマップの表示
         fig, ax = plt.subplots(1, 1, figsize=(5, 4), constrained_layout=True) # figsizeで図のサイズを指定できます
         im = ax.imshow(debug_img, cmap='viridis', vmin=0, vmax=255)
@@ -323,40 +330,41 @@ if all_aligned_gfp_data_right:
 else:
     print("右側の有効な馬蹄形が全く検出されませんでした。右側のヒートマップは黒になります。")
 
-# 【修正4: Heatmapの個別出力】
-if all_aligned_gfp_data_left:
-    # BGRまたはRGB画像に変換しないとimshowはカラーマップを適用できない
-    # 実際にはmatplotlibのcmapを使いたいが、cv2.imshowを使う場合は、擬似カラーを適用する
-    left_heatmap_colored = cv2.applyColorMap(average_heatmap_left_normalized, cv2.COLORMAP_VIRIDIS)
-    cv2.imshow("Heatmap (Left) - Individual Output", left_heatmap_colored)
+if(DEBUG_FLAG == 1):
+    # 【修正4: Heatmapの個別出力】
+    if all_aligned_gfp_data_left:
+        # BGRまたはRGB画像に変換しないとimshowはカラーマップを適用できない
+        # 実際にはmatplotlibのcmapを使いたいが、cv2.imshowを使う場合は、擬似カラーを適用する
+        left_heatmap_colored = cv2.applyColorMap(average_heatmap_left_normalized, cv2.COLORMAP_VIRIDIS)
+        cv2.imshow("Heatmap (Left) - Individual Output", left_heatmap_colored)
 
-    # 保存用のヒートマップの表示
-    fig, ax = plt.subplots(1, 1, figsize=(5, 4)) # figsizeで図のサイズを指定できます
-    im = ax.imshow(average_heatmap_left_normalized, cmap='viridis', vmin=0, vmax=255)
-    # カラーバーの追加
-    plt.colorbar(im, ax=ax, label='Normalized Average GFP Intensity')
-    # タイトルの設定
-    ax.set_title('Average GFP Intensity Heatmap \n(Left Horseshoes)')
-    # 軸の非表示
-    ax.axis('off')
-    # 図の表示
-    plt.show()
+        # 保存用のヒートマップの表示
+        fig, ax = plt.subplots(1, 1, figsize=(5, 4)) # figsizeで図のサイズを指定できます
+        im = ax.imshow(average_heatmap_left_normalized, cmap='viridis', vmin=0, vmax=255)
+        # カラーバーの追加
+        plt.colorbar(im, ax=ax, label='Normalized Average GFP Intensity')
+        # タイトルの設定
+        ax.set_title('Average GFP Intensity Heatmap \n(Left Horseshoes)')
+        # 軸の非表示
+        ax.axis('off')
+        # 図の表示
+        plt.show()
 
-if all_aligned_gfp_data_right:
-    right_heatmap_colored = cv2.applyColorMap(average_heatmap_right_normalized, cv2.COLORMAP_VIRIDIS)
-    cv2.imshow("Heatmap (Right) - Individual Output", right_heatmap_colored)
+    if all_aligned_gfp_data_right:
+        right_heatmap_colored = cv2.applyColorMap(average_heatmap_right_normalized, cv2.COLORMAP_VIRIDIS)
+        cv2.imshow("Heatmap (Right) - Individual Output", right_heatmap_colored)
 
-    # 保存用のヒートマップの表示
-    fig, ax = plt.subplots(1, 1, figsize=(5, 4)) # figsizeで図のサイズを指定できます
-    im = ax.imshow(average_heatmap_right_normalized, cmap='viridis', vmin=0, vmax=255)
-    # カラーバーの追加
-    plt.colorbar(im, ax=ax, label='Normalized Average GFP Intensity')
-    # タイトルの設定
-    ax.set_title('Average GFP Intensity Heatmap \n(Left Horseshoes)')
-    # 軸の非表示
-    ax.axis('off')
-    # 図の表示
-    plt.show()
+        # 保存用のヒートマップの表示
+        fig, ax = plt.subplots(1, 1, figsize=(5, 4)) # figsizeで図のサイズを指定できます
+        im = ax.imshow(average_heatmap_right_normalized, cmap='viridis', vmin=0, vmax=255)
+        # カラーバーの追加
+        plt.colorbar(im, ax=ax, label='Normalized Average GFP Intensity')
+        # タイトルの設定
+        ax.set_title('Average GFP Intensity Heatmap \n(Left Horseshoes)')
+        # 軸の非表示
+        ax.axis('off')
+        # 図の表示
+        plt.show()
 
 cv2.waitKey(0) 
 cv2.destroyAllWindows()
@@ -370,25 +378,57 @@ num_plots = 3 # デバッグ、左ヒートマップ、右ヒートマップの3
 num_image_sets = len(image_pairs) # processed_images_for_plotの数
 num_rows_for_display = num_image_sets if num_image_sets > 0 else 1 # 少なくとも1行確保
 num_plots = 3
+num_image_sets = len(image_pairs) 
+num_rows_for_display = num_image_sets if num_image_sets > 0 else 1 
 
-plt.figure(figsize=(num_plots * 4, 7)) # プロット数に応じて全体のサイズを調整
+fig = plt.figure(figsize=(num_plots * 4, 4))
 
 plot_index = 1
 
-# # Debug画像のプロット
-for i in range(num_image_sets):
-    # オリジナル画像のプロット (i行目の1列目)
-    plt.subplot(num_rows_for_display, num_plots, i * num_plots + 1)
-    plt.imshow(cv2.cvtColor(debug_images[i], cv2.COLOR_BGR2RGB))
-    plt.title(f'Original Image {i+1} \n(Cropped)')
-    plt.axis('off')
+rows_inner = 2
+cols_inner = 2
+num_debug_images = len(debug_images)
+
+if num_debug_images >= 4:
+    # ----------------------------------------------------
+    # 2. 外側の GridSpec を定義 (図全体を1行 num_plots列に分割)
+    # これが「三分割したうち」のベースとなるグリッドです。
+    gs_outer = gridspec.GridSpec(1, num_plots, figure=fig)
+    # ----------------------------------------------------
+
+    # ----------------------------------------------------
+    # 3. 1区画目 (左端: gs_outer[0, 0]) の中に、内側の GridSpec (2行2列) をネストして定義
+    gs_inner = gridspec.GridSpecFromSubplotSpec(rows_inner, cols_inner, 
+                                                subplot_spec=gs_outer[0, 0],
+                                                wspace=0.1, hspace=0.1) # 余白の調整
+    # ----------------------------------------------------
+
+    # 4. 2x2 の各セルにデバッグ画像をプロット
+    for i in range(num_debug_images):
+        if(i>=4):
+            break
+        if i < rows_inner * cols_inner:
+            # fig.add_subplot(gs_inner[i]) で、内側のグリッドのセルを指定
+            ax = fig.add_subplot(gs_inner[i])
+
+            # 画像表示処理 (元のコードを踏襲)
+            ax.imshow(cv2.cvtColor(debug_images[i], cv2.COLOR_BGR2RGB))
+            ax.set_title(f'Annotated {i+1}', fontsize=10) # タイトルを小さくする
+            ax.axis('off')
+else:
+    # Debug画像のプロット
+    for i in range(num_image_sets):
+        plt.subplot(num_rows_for_display, num_plots, i * num_plots + 1)
+        plt.imshow(cv2.cvtColor(debug_images[i], cv2.COLOR_BGR2RGB))
+        plt.title(f'Annotated Image {i+1}')
+        plt.axis('off')
 plot_index += 1
 
 # 左側のヒートマップのプロット
 plt.subplot(1, num_plots, plot_index)
 plt.imshow(average_heatmap_left_normalized, cmap='viridis', vmin=0, vmax=255)
 plt.colorbar(label='Normalized Average GFP Intensity')
-plt.title('Average GFP Intensity Heatmap \n(Left Horseshoes)')
+plt.title('Average GFP Intensity Heatmap \n(Ventral Horseshoes)')
 plt.axis('off')
 plot_index += 1
 
@@ -396,7 +436,7 @@ plot_index += 1
 plt.subplot(1, num_plots, plot_index)
 plt.imshow(average_heatmap_right_normalized, cmap='viridis', vmin=0, vmax=255)
 plt.colorbar(label='Normalized Average GFP Intensity')
-plt.title('Average GFP Intensity Heatmap \n(Right Horseshoes)')
+plt.title('Average GFP Intensity Heatmap \n(Dorsal Horseshoes)')
 plt.axis('off')
 plot_index += 1
 
