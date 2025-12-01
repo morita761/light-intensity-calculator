@@ -2,18 +2,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import ttest_ind
 
-# pip install scipy
-
-# # CSV読み込み
-# df = pd.read_csv('data.csv')  # ファイル名を適宜変更してください
-
 # # 箱ひげ図を描くためのデータを整形
-# data = [df['left_intensity'], df['right_intensity']]
 labels = ['Ventral', 'Dorsal']
 
-
+# # CSV読み込み
 # カラム名の確認（スペースを含むカラム名があるので注意）
-df = pd.read_csv("v.csv", delim_whitespace=True, names=["left_intensity", "right_intensity"], skiprows=1)
+df = pd.read_csv("v_normalize.csv", delim_whitespace=True, names=["left_intensity", "right_intensity"], skiprows=1)
 data = [df['left_intensity'], df['right_intensity']]
 
 # タイトルを変数として定義
@@ -47,7 +41,6 @@ def get_pvalue_asterisk(p):
 
 
 # プロット
-# fig, ax = plt.subplots()
 fig, ax = plt.subplots(figsize=(6, 5))
 
 # 箱ひげ図の作成

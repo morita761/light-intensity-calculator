@@ -58,10 +58,10 @@ def plot_box(ax, df, title):
     asters = get_pvalue_asterisk(p_val)
 
     # 線とアスタリスク
-    y_max = max(max(data[0]), max(data[1])) + 11
+    y_max = max(max(data[0]), max(data[1])) + 7
     ax.plot([1, 1, 2, 2], [y_max, y_max + 2, y_max + 2, y_max],
             lw=1.5, c='black')
-    ax.text(1.5, y_max + 2, asters, ha='center', fontsize=16)
+    ax.text(1.5, y_max + 1, asters, ha='center', fontsize=16)
 
     # タイトル
     ax.set_title(title, fontsize=15)
