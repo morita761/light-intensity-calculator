@@ -213,7 +213,7 @@ def plot_results(debug_images, heatmap_left, heatmap_right):
 
 # --- Main Execution ---
 if __name__ == "__main__":
-    predictor = setup_predictor("./output/model_0024999.pth", score_threshold=0.3)
+    predictor = setup_predictor("./output/model_final.pth", score_threshold=0.3)
     
     # ここでクラス名を定義。モデルの学習時のクラス順序と一致させる必要があります。
     # 0:'background', 1:'horseshoe'

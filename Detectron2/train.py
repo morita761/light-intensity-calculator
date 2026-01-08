@@ -15,9 +15,8 @@ import os
 
 # データセット登録
 
-# register_coco_instances("horseshoe_dataset", {}, "train_annotations.json", "simpledataset/images/")
-register_coco_instances("horseshoe_dataset_train", {}, "train_annotations_horseshoe_RGB.json", "../data/2img/")
-register_coco_instances("horseshoe_dataset_val", {}, "val_annotations_horseshoe_RGB.json", "../data/2img_val/") # 追加
+register_coco_instances("horseshoe_train", {}, "train_annotations.json", "../data/train/images/")
+register_coco_instances("horseshoe_val", {}, "val_annotations.json", "../data/val/images/")
 
 cfg = get_cfg()
 # Mask R-CNN R50-FPN
@@ -36,8 +35,8 @@ cfg.MODEL.WEIGHTS = "../data/model/model_final_f10217.pkl" # ダウンロード�
 # cfg.merge_from_file("detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml")
 # cfg.MODEL.WEIGHTS = "detectron2://COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x/139653917/model_final_2d9806.pkl"
 
-cfg.DATASETS.TRAIN = ("horseshoe_dataset_train",)
-cfg.DATASETS.TEST = ("horseshoe_dataset_val",) # ここを変更
+cfg.DATASETS.TRAIN = ("horseshoe_train",)
+cfg.DATASETS.TEST = ("horseshoe_val",)
 # cfg.DATASETS.TEST = ()
 cfg.DATALOADER.NUM_WORKERS = 2
 cfg.OUTPUT_DIR = "./output"
@@ -102,10 +101,9 @@ class CustomTrainer(DefaultTrainer):
             output_folder = os.path.join(cfg.OUTPUT_DIR, "inference")
             os.makedirs(output_folder, exist_ok=True) # 評価結果フォルダも作成
 
-        # "horseshoe_dataset_val" の評価には COCOEvaluator を使用します。
+        # "horseshoe_val" の評価には COCOEvaluator を使用します。
         # データセットがCOCO形式のjsonアノテーションを持っていることを前提としています。
-        if dataset_name == "horseshoe_dataset_val":
-            print("data set")
+        if dataset_name == "horseshoe_val":
             return COCOEvaluator(dataset_name, cfg, True, output_folder)
         
         # 他のデータセット名に対する評価器が必要な場合は、ここに追加できます。

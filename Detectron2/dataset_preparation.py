@@ -198,16 +198,16 @@ def create_coco_annotations(img_dir, mask_dir, output_json_path, use_multicolor=
 if __name__ == "__main__":
     # 学習データ（複数色対応）
     create_coco_annotations(
-        img_dir="../data/img",
-        mask_dir="../data/masks",
-        output_json_path="train_annotations_horseshoe_2.json",
+        img_dir="../data/train/images",
+        mask_dir="../data/train/masks",
+        output_json_path="train_annotations.json",
         use_multicolor=True
     )
 
     # 検証データ（複数色対応）
     create_coco_annotations(
-        img_dir="../data/img_val",
-        mask_dir="../data/masks_val",
-        output_json_path="val_annotations_horseshoe.json",
+        img_dir="../data/val/images",
+        mask_dir="../data/val/masks",
+        output_json_path="val_annotations.json",
         use_multicolor=True
     )

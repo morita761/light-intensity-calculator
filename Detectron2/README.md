@@ -12,9 +12,19 @@ Detectron2/
 ├── func/
 │   ├── intensityCalc.py        # PCA + K-Meansによる輝度計算
 │   └── splitobje.py            # 画像分割・緑色抽出
-├── simpledataset/              # サンプルデータセット
-├── tensorboard/                # 学習ログ
-└── *_annotations*.json         # COCOアノテーションファイル
+├── train_annotations.json      # 学習用アノテーション
+├── val_annotations.json        # 検証用アノテーション
+├── output/
+│   └── model_final.pth         # 学習済みモデル
+└── tensorboard/                # 学習ログ
+
+../data/                        # データセット（gitignore）
+├── train/
+│   ├── images/                 # 学習画像
+│   └── masks/                  # 学習マスク
+└── val/
+    ├── images/                 # 検証画像
+    └── masks/                  # 検証マスク
 ```
 
 ## 使用方法
@@ -48,8 +58,10 @@ Mask R-CNN（ResNet-50 FPN）の学習スクリプト。
 | 緑色 | horseshoe | 0 |
 | 黄色 | horseshoe | 0 |
 
-- `simpledataset/images/` - 入力画像
-- `simpledataset/masks/` - マスク画像
+- `../data/train/images/` - 学習用画像
+- `../data/train/masks/` - 学習用マスク
+- `../data/val/images/` - 検証用画像
+- `../data/val/masks/` - 検証用マスク
 
 ### inference_ver2_heatmaps.py
 推論と可視化を行うメインスクリプト。
