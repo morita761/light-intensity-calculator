@@ -47,7 +47,7 @@ cfg.SOLVER.BASE_LR = 0.0001
 # cfg.SOLVER.MAX_ITER = 300
 cfg.SOLVER.MAX_ITER = 270000
 cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 128
-cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1  # horseshoe
+cfg.MODEL.ROI_HEADS.NUM_CLASSES = 2  # horseshoe, negative
 cfg.TEST.EVAL_PERIOD = 50 # 50イテレーションごとに評価を実行（任意、デフォルトは0）
 
 os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)

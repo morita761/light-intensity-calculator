@@ -39,6 +39,15 @@ Mask R-CNN（ResNet-50 FPN）の学習スクリプト。
 
 ### dataset_preparation.py
 マスク画像からCOCO形式のアノテーションJSONを生成。
+
+**アノテーションの色対応:**
+| マスクの色 | クラス | category_id |
+|-----------|--------|-------------|
+| 赤色 | negative | 1 |
+| 青色 | horseshoe | 0 |
+| 緑色 | horseshoe | 0 |
+| 黄色 | horseshoe | 0 |
+
 - `simpledataset/images/` - 入力画像
 - `simpledataset/masks/` - マスク画像
 
