@@ -146,16 +146,16 @@ def interpolate_profiles(profiles, target_length=100):
     return np.array(interpolated_profiles)
 
 
-def extract_average_profile(image_path, colors=None):
+def extract_raw_profiles(image_path, colors=None):
     """
-    画像内の指定色の長方形領域の緑色輝度プロファイルを抽出し、平均プロファイルを返します。
+    画像内の指定色の長方形領域の緑色輝度プロファイルを抽出します（ノーマライズなし）。
 
     Args:
         image_path (str): 画像ファイルのパス。
         colors (list): 検出する色のリスト（例: ['blue', 'yellow']）。Noneの場合は['blue']。
 
     Returns:
-        tuple: (average_profile, all_profiles, img_with_rects) または エラー時は (None, None, None)
+        tuple: (all_raw_profiles, img_with_rects) または エラー時は (None, None)
     """
     if colors is None:
         colors = ['blue']
@@ -164,7 +164,7 @@ def extract_average_profile(image_path, colors=None):
 
     if img is None:
         print(f"エラー: 画像 '{image_path}' を読み込めませんでした。")
-        return None, None, None
+        return None, None
 
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
@@ -173,9 +173,9 @@ def extract_average_profile(image_path, colors=None):
 
     if not contours:
         print(f"エラー: 画像 '{image_path}' に指定色({colors})の長方形が見つかりませんでした。")
-        return None, None, None
+        return None, None
 
-    all_intensity_profiles = []
+    all_raw_profiles = []
 
     for contour in contours:
         if cv2.contourArea(contour) < 100:
@@ -186,18 +186,50 @@ def extract_average_profile(image_path, colors=None):
         _, g_channel, _ = cv2.split(roi)
         green_intensity_profile = np.mean(g_channel, axis=0)
 
-        if np.max(green_intensity_profile) > 0:
-            normalized_profile = green_intensity_profile / np.max(green_intensity_profile)
-        else:
-            normalized_profile = green_intensity_profile
-
-        all_intensity_profiles.append(normalized_profile)
-        # 検出枠を白色で描画（複数色対応のため）
+        all_raw_profiles.append(green_intensity_profile)
         cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 255), 2)
 
-    if not all_intensity_profiles:
+    if not all_raw_profiles:
         print(f"エラー: 画像 '{image_path}' に有効な指定色({colors})の長方形領域が見つかりませんでした。")
+        return None, None
+
+    return all_raw_profiles, img
+
+
+def extract_average_profile(image_path, colors=None, normalize=True, global_max=None):
+    """
+    画像内の指定色の長方形領域の緑色輝度プロファイルを抽出し、平均プロファイルを返します。
+
+    Args:
+        image_path (str): 画像ファイルのパス。
+        colors (list): 検出する色のリスト（例: ['blue', 'yellow']）。Noneの場合は['blue']。
+        normalize (bool): ノーマライズを行うかどうか。
+        global_max (float): グローバルな最大値でノーマライズする場合に指定。
+
+    Returns:
+        tuple: (average_profile, all_profiles, img_with_rects) または エラー時は (None, None, None)
+    """
+    raw_profiles, img = extract_raw_profiles(image_path, colors)
+
+    if raw_profiles is None:
         return None, None, None
+
+    # ノーマライズ処理
+    if normalize:
+        if global_max is None:
+            # 各プロファイルの最大値でノーマライズ
+            all_intensity_profiles = []
+            for profile in raw_profiles:
+                max_val = np.max(profile)
+                if max_val > 0:
+                    all_intensity_profiles.append(profile / max_val)
+                else:
+                    all_intensity_profiles.append(profile)
+        else:
+            # グローバル最大値でノーマライズ
+            all_intensity_profiles = [profile / global_max if global_max > 0 else profile for profile in raw_profiles]
+    else:
+        all_intensity_profiles = raw_profiles
 
     target_length = min([len(p) for p in all_intensity_profiles])
     interpolated_profiles = interpolate_profiles(all_intensity_profiles, target_length=target_length)
@@ -321,6 +353,7 @@ def plot_multi_region_green_intensity_profiles(image_path, colors=None):
 def plot_multiple_files(image_paths, colors=None):
     """
     複数の画像ファイルの平均プロファイルを一つのグラフに重ねて表示します。
+    全画像の緑色輝度の最大値でノーマライズを行います。
 
     Args:
         image_paths (list): 画像ファイルのパスのリスト。
@@ -329,36 +362,60 @@ def plot_multiple_files(image_paths, colors=None):
     if colors is None:
         colors = ['blue']
 
-    all_average_profiles = []
-    file_names = []
-    debug_images = []  # デバッグ画像を保存
+    # 1. まず全画像から生のプロファイルを抽出し、グローバル最大値を計算
+    all_raw_data = []  # [(file_name, raw_profiles, img), ...]
+    global_max = 0
 
     for image_path in image_paths:
-        avg_profile, _, img_with_rects = extract_average_profile(image_path, colors)
-        if avg_profile is not None:
-            all_average_profiles.append(avg_profile)
-            file_names.append(os.path.basename(image_path))
-            if img_with_rects is not None:
-                debug_images.append((img_with_rects, os.path.basename(image_path)))
+        raw_profiles, img = extract_raw_profiles(image_path, colors)
+        if raw_profiles is not None:
+            file_name = os.path.basename(image_path)
+            all_raw_data.append((file_name, raw_profiles, img))
+            # 各プロファイルの最大値を確認してグローバル最大値を更新
+            for profile in raw_profiles:
+                local_max = np.max(profile)
+                if local_max > global_max:
+                    global_max = local_max
 
-    if not all_average_profiles:
+    if not all_raw_data:
         print("エラー: 有効なプロファイルが取得できませんでした。")
         return
 
-    # すべてのプロファイルを同じ長さに補間
+    print(f"グローバル最大値: {global_max}")
+
+    # 2. グローバル最大値で全プロファイルをノーマライズし、各画像の平均プロファイルを計算
+    all_average_profiles = []
+    file_names = []
+    debug_images = []
+
+    for file_name, raw_profiles, img in all_raw_data:
+        # グローバル最大値でノーマライズ
+        normalized_profiles = [profile / global_max if global_max > 0 else profile for profile in raw_profiles]
+
+        # 補間して平均を計算
+        target_length = min([len(p) for p in normalized_profiles])
+        interpolated = interpolate_profiles(normalized_profiles, target_length=target_length)
+        avg_profile = np.mean(interpolated, axis=0)
+
+        all_average_profiles.append(avg_profile)
+        file_names.append(file_name)
+        if img is not None:
+            debug_images.append((img, file_name))
+
+    # すべての平均プロファイルを同じ長さに補間
     target_length = min([len(p) for p in all_average_profiles])
     interpolated_profiles = interpolate_profiles(all_average_profiles, target_length=target_length)
 
     # 複数ファイルの平均プロファイルを重ねてプロット
     plt.figure(figsize=(12, 7))
-    colors = plt.cm.tab10(np.linspace(0, 1, len(interpolated_profiles)))
+    plot_colors = plt.cm.tab10(np.linspace(0, 1, len(interpolated_profiles)))
 
     for i, (profile, name) in enumerate(zip(interpolated_profiles, file_names)):
-        plt.plot(profile, color=colors[i], label=name)
+        plt.plot(profile, color=plot_colors[i], label=name)
 
-    plt.title('Average Normalized Green Intensity Gradient (Multiple Files)')
+    plt.title('Average Normalized Green Intensity Gradient (Global Normalization)')
     plt.xlabel('Horizontal Position (normalized)')
-    plt.ylabel('Average Normalized Green Intensity')
+    plt.ylabel('Normalized Green Intensity')
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
