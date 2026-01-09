@@ -148,7 +148,7 @@ def interpolate_profiles(profiles, target_length=100):
 
 def extract_raw_profiles(image_path, colors=None):
     """
-    画像内の指定色の長方形領域の緑色輝度プロファイルを抽出します（ノーマライズなし）。
+    画像内の指定色の長方形領域の内側の緑色輝度プロファイルを抽出します（ノーマライズなし）。
 
     Args:
         image_path (str): 画像ファイルのパス。
@@ -169,15 +169,21 @@ def extract_raw_profiles(image_path, colors=None):
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
     mask = get_combined_color_mask(hsv, colors)
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    # RETR_CCOMPで階層構造を取得し、内側の輪郭を選択
+    contours, hierarchy = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
 
-    if not contours:
+    if not contours or hierarchy is None:
         print(f"エラー: 画像 '{image_path}' に指定色({colors})の長方形が見つかりませんでした。")
         return None, None
 
     all_raw_profiles = []
 
-    for contour in contours:
+    # 内側の輪郭（親を持つ輪郭）のみを処理
+    for i, contour in enumerate(contours):
+        # hierarchy[0][i][3] は親輪郭のインデックス。-1でなければ内側の輪郭
+        if hierarchy[0][i][3] == -1:
+            continue  # 外側の輪郭はスキップ
+
         if cv2.contourArea(contour) < 100:
             continue
 
@@ -190,7 +196,7 @@ def extract_raw_profiles(image_path, colors=None):
         cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 255), 2)
 
     if not all_raw_profiles:
-        print(f"エラー: 画像 '{image_path}' に有効な指定色({colors})の長方形領域が見つかりませんでした。")
+        print(f"エラー: 画像 '{image_path}' に有効な指定色({colors})の内側領域が見つかりませんでした。")
         return None, None
 
     return all_raw_profiles, img
@@ -262,10 +268,10 @@ def plot_multi_region_green_intensity_profiles(image_path, colors=None):
 
     mask = get_combined_color_mask(hsv, colors)
 
-    # マスクから輪郭を見つける
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    # RETR_CCOMPで階層構造を取得し、内側の輪郭を選択
+    contours, hierarchy = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
 
-    if not contours:
+    if not contours or hierarchy is None:
         print(f"エラー: 画像内に指定色({colors})の長方形が見つかりませんでした。HSVの範囲を調整してみてください。")
         show_debug_image(mask, f"Color Mask ({colors}) for debug")
         cv2.waitKey(0)
@@ -276,8 +282,12 @@ def plot_multi_region_green_intensity_profiles(image_path, colors=None):
     all_intensity_profiles = []
     detected_rects = []
 
-    # 検出されたすべての長方形を処理
+    # 内側の輪郭（親を持つ輪郭）のみを処理
     for i, contour in enumerate(contours):
+        # hierarchy[0][i][3] は親輪郭のインデックス。-1でなければ内側の輪郭
+        if hierarchy[0][i][3] == -1:
+            continue  # 外側の輪郭はスキップ
+
         # 小さすぎる輪郭はノイズとみなしてスキップ
         if cv2.contourArea(contour) < 100:
             continue
@@ -304,7 +314,7 @@ def plot_multi_region_green_intensity_profiles(image_path, colors=None):
         cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 255), 2)
 
     if not all_intensity_profiles:
-        print(f"エラー: 有効な指定色({colors})の長方形領域が見つかりませんでした。輪郭の面積閾値を調整してみてください。")
+        print(f"エラー: 有効な指定色({colors})の内側領域が見つかりませんでした。輪郭の面積閾値を調整してみてください。")
         return
 
     # -----------------------------------------------------------
