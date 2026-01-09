@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-import argparse
 import os
 
 
@@ -146,12 +145,13 @@ def interpolate_profiles(profiles, target_length=100):
     return np.array(interpolated_profiles)
 
 
-def extract_raw_profiles(image_path, colors=None):
+def extract_raw_profiles(mask_path, original_path, colors=None):
     """
-    画像内の指定色の長方形領域の内側の緑色輝度プロファイルを抽出します（ノーマライズなし）。
+    マスク画像から輪郭を抽出し、元画像から緑色輝度プロファイルを抽出します（ノーマライズなし）。
 
     Args:
-        image_path (str): 画像ファイルのパス。
+        mask_path (str): マスク画像（色付き長方形がある画像）のパス。
+        original_path (str): 元画像（アノテーションなし）のパス。
         colors (list): 検出する色のリスト（例: ['blue', 'yellow']）。Noneの場合は['blue']。
 
     Returns:
@@ -160,54 +160,57 @@ def extract_raw_profiles(image_path, colors=None):
     if colors is None:
         colors = ['blue']
 
-    img = cv2.imread(image_path)
-
-    if img is None:
-        print(f"エラー: 画像 '{image_path}' を読み込めませんでした。")
+    # マスク画像を読み込み（輪郭検出用）
+    mask_img = cv2.imread(mask_path)
+    if mask_img is None:
+        print(f"エラー: マスク画像 '{mask_path}' を読み込めませんでした。")
         return None, None
 
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    # 元画像を読み込み（輝度測定用）
+    original_img = cv2.imread(original_path)
+    if original_img is None:
+        print(f"エラー: 元画像 '{original_path}' を読み込めませんでした。")
+        return None, None
 
+    # マスク画像から輪郭を検出
+    hsv = cv2.cvtColor(mask_img, cv2.COLOR_BGR2HSV)
     mask = get_combined_color_mask(hsv, colors)
-    # RETR_CCOMPで階層構造を取得し、内側の輪郭を選択
-    contours, hierarchy = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    if not contours or hierarchy is None:
-        print(f"エラー: 画像 '{image_path}' に指定色({colors})の長方形が見つかりませんでした。")
+    if not contours:
+        print(f"エラー: マスク画像 '{mask_path}' に指定色({colors})の長方形が見つかりませんでした。")
         return None, None
 
     all_raw_profiles = []
 
-    # 内側の輪郭（親を持つ輪郭）のみを処理
-    for i, contour in enumerate(contours):
-        # hierarchy[0][i][3] は親輪郭のインデックス。-1でなければ内側の輪郭
-        if hierarchy[0][i][3] == -1:
-            continue  # 外側の輪郭はスキップ
-
+    for contour in contours:
         if cv2.contourArea(contour) < 100:
             continue
 
         x, y, w, h = cv2.boundingRect(contour)
-        roi = img[y:y+h, x:x+w]
+        # 元画像から緑色輝度を抽出
+        roi = original_img[y:y+h, x:x+w]
         _, g_channel, _ = cv2.split(roi)
         green_intensity_profile = np.mean(g_channel, axis=0)
 
         all_raw_profiles.append(green_intensity_profile)
-        cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 255), 2)
+        # デバッグ用に元画像に検出領域を描画
+        cv2.rectangle(original_img, (x, y), (x + w, y + h), (255, 255, 255), 2)
 
     if not all_raw_profiles:
-        print(f"エラー: 画像 '{image_path}' に有効な指定色({colors})の内側領域が見つかりませんでした。")
+        print(f"エラー: マスク画像 '{mask_path}' に有効な指定色({colors})の領域が見つかりませんでした。")
         return None, None
 
-    return all_raw_profiles, img
+    return all_raw_profiles, original_img
 
 
-def extract_average_profile(image_path, colors=None, normalize=True, global_max=None):
+def extract_average_profile(mask_path, original_path, colors=None, normalize=True, global_max=None):
     """
-    画像内の指定色の長方形領域の緑色輝度プロファイルを抽出し、平均プロファイルを返します。
+    マスク画像から輪郭を抽出し、元画像から緑色輝度プロファイルを抽出して平均プロファイルを返します。
 
     Args:
-        image_path (str): 画像ファイルのパス。
+        mask_path (str): マスク画像（色付き長方形がある画像）のパス。
+        original_path (str): 元画像（アノテーションなし）のパス。
         colors (list): 検出する色のリスト（例: ['blue', 'yellow']）。Noneの場合は['blue']。
         normalize (bool): ノーマライズを行うかどうか。
         global_max (float): グローバルな最大値でノーマライズする場合に指定。
@@ -215,7 +218,7 @@ def extract_average_profile(image_path, colors=None, normalize=True, global_max=
     Returns:
         tuple: (average_profile, all_profiles, img_with_rects) または エラー時は (None, None, None)
     """
-    raw_profiles, img = extract_raw_profiles(image_path, colors)
+    raw_profiles, img = extract_raw_profiles(mask_path, original_path, colors)
 
     if raw_profiles is None:
         return None, None, None
@@ -244,35 +247,38 @@ def extract_average_profile(image_path, colors=None, normalize=True, global_max=
     return average_profile, all_intensity_profiles, img
 
 
-def plot_multi_region_green_intensity_profiles(image_path, colors=None):
+def plot_multi_region_green_intensity_profiles(mask_path, original_path, colors=None):
     """
-    画像内の指定色の長方形領域の緑色輝度プロファイルを抽出し、正規化してプロットします。
+    マスク画像から輪郭を抽出し、元画像から緑色輝度プロファイルを抽出してプロットします。
     各領域のプロットと、それらの平均プロットの2種類を出力します。
 
     Args:
-        image_path (str): 画像ファイルのパス。
+        mask_path (str): マスク画像（色付き長方形がある画像）のパス。
+        original_path (str): 元画像（アノテーションなし）のパス。
         colors (list): 検出する色のリスト（例: ['blue', 'yellow']）。Noneの場合は['blue']。
     """
     if colors is None:
         colors = ['blue']
 
-    # 1. 画像の読み込み
-    img = cv2.imread(image_path)
-
-    if img is None:
-        print(f"エラー: 画像 '{image_path}' を読み込めませんでした。")
+    # 1. マスク画像の読み込み（輪郭検出用）
+    mask_img = cv2.imread(mask_path)
+    if mask_img is None:
+        print(f"エラー: マスク画像 '{mask_path}' を読み込めませんでした。")
         return
 
-    # 2. 指定色の長方形の識別
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    # 2. 元画像の読み込み（輝度測定用）
+    original_img = cv2.imread(original_path)
+    if original_img is None:
+        print(f"エラー: 元画像 '{original_path}' を読み込めませんでした。")
+        return
 
+    # 3. マスク画像から輪郭を検出
+    hsv = cv2.cvtColor(mask_img, cv2.COLOR_BGR2HSV)
     mask = get_combined_color_mask(hsv, colors)
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    # RETR_CCOMPで階層構造を取得し、内側の輪郭を選択
-    contours, hierarchy = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-
-    if not contours or hierarchy is None:
-        print(f"エラー: 画像内に指定色({colors})の長方形が見つかりませんでした。HSVの範囲を調整してみてください。")
+    if not contours:
+        print(f"エラー: マスク画像内に指定色({colors})の長方形が見つかりませんでした。HSVの範囲を調整してみてください。")
         show_debug_image(mask, f"Color Mask ({colors}) for debug")
         cv2.waitKey(0)
         cv2.destroyAllWindows()
@@ -282,20 +288,15 @@ def plot_multi_region_green_intensity_profiles(image_path, colors=None):
     all_intensity_profiles = []
     detected_rects = []
 
-    # 内側の輪郭（親を持つ輪郭）のみを処理
-    for i, contour in enumerate(contours):
-        # hierarchy[0][i][3] は親輪郭のインデックス。-1でなければ内側の輪郭
-        if hierarchy[0][i][3] == -1:
-            continue  # 外側の輪郭はスキップ
-
+    for contour in contours:
         # 小さすぎる輪郭はノイズとみなしてスキップ
         if cv2.contourArea(contour) < 100:
             continue
 
         x, y, w, h = cv2.boundingRect(contour)
 
-        # 指定領域内の緑色輝度を抽出
-        roi = img[y:y+h, x:x+w]
+        # 元画像から緑色輝度を抽出
+        roi = original_img[y:y+h, x:x+w]
         _, g_channel, _ = cv2.split(roi)
 
         # 緑色輝度プロファイルを作成 (各列の平均)
@@ -310,11 +311,11 @@ def plot_multi_region_green_intensity_profiles(image_path, colors=None):
         all_intensity_profiles.append(normalized_profile)
         detected_rects.append((x, y, w, h))
 
-        # 検出された長方形を画像に描画 (白色で描画)
-        cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 255), 2)
+        # 検出された長方形を元画像に描画 (白色で描画)
+        cv2.rectangle(original_img, (x, y), (x + w, y + h), (255, 255, 255), 2)
 
     if not all_intensity_profiles:
-        print(f"エラー: 有効な指定色({colors})の内側領域が見つかりませんでした。輪郭の面積閾値を調整してみてください。")
+        print(f"エラー: 有効な指定色({colors})の領域が見つかりませんでした。輪郭の面積閾値を調整してみてください。")
         return
 
     # -----------------------------------------------------------
@@ -354,19 +355,19 @@ def plot_multi_region_green_intensity_profiles(image_path, colors=None):
     plt.show()
 
     # 検出された長方形が描画された画像を表示 (確認用)
-    title = f"Detected Rectangles: {os.path.basename(image_path)}"
-    show_debug_image(img, title)
+    title = f"Detected Rectangles: {os.path.basename(original_path)}"
+    show_debug_image(original_img, title)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
 
-def plot_multiple_files(image_paths, colors=None):
+def plot_multiple_files(file_pairs, colors=None):
     """
-    複数の画像ファイルの平均プロファイルを一つのグラフに重ねて表示します。
+    複数の画像ファイルペアの平均プロファイルを一つのグラフに重ねて表示します。
     全画像の緑色輝度の最大値でノーマライズを行います。
 
     Args:
-        image_paths (list): 画像ファイルのパスのリスト。
+        file_pairs (list): [(mask_path, original_path), ...] のリスト。
         colors (list): 検出する色のリスト（例: ['blue', 'yellow']）。Noneの場合は['blue']。
     """
     if colors is None:
@@ -376,10 +377,10 @@ def plot_multiple_files(image_paths, colors=None):
     all_raw_data = []  # [(file_name, raw_profiles, img), ...]
     global_max = 0
 
-    for image_path in image_paths:
-        raw_profiles, img = extract_raw_profiles(image_path, colors)
+    for mask_path, original_path in file_pairs:
+        raw_profiles, img = extract_raw_profiles(mask_path, original_path, colors)
         if raw_profiles is not None:
-            file_name = os.path.basename(image_path)
+            file_name = os.path.basename(original_path)
             all_raw_data.append((file_name, raw_profiles, img))
             # 各プロファイルの最大値を確認してグローバル最大値を更新
             for profile in raw_profiles:
@@ -437,66 +438,38 @@ def plot_multiple_files(image_paths, colors=None):
         show_debug_images_sequential(debug_images)
 
 
-# ハードコードされたデフォルトファイルリスト（引数なしの場合に使用）
-DEFAULT_IMAGE_FILES = [
-    './001_fz_Fz2_green_mask.tif',
-    # './20250403_again_24%APF_Fz-GFP_fz-RNAi_sita_0063_green_grad_mask.tif',
-    # './Fz2-GFP_1_ue_mask.tif',
+# ============================================================
+# 設定
+# ============================================================
+
+# 画像ペアリスト
+# 形式: [{'original': 元画像パス, 'mask': マスク画像パス}, ...]
+image_pairs = [
+    {'original': './pics/vang/Projections of 20250404_24%APF_Fz-GFP_loco-vang-Cas9P_001_ue.png',
+     'mask': './pics/vang/Projections of 20250404_24%APF_Fz-GFP_loco-vang-Cas9P_001_ue_mask.tif'},
 ]
 
-# 個別プロットモード（True: 各ファイルを個別に, False: 重ねてプロット）
-DEFAULT_SINGLE_MODE = False
+# 個別プロットモード（True: 各ファイルペアを個別に, False: 重ねてプロット）
+SINGLE_MODE = False
 
-# デフォルトの検出色（複数指定可）
+# 検出色（複数指定可）
 # 対応色: blue, yellow, red, green, cyan, magenta
-DEFAULT_COLORS = ['blue']
+COLORS = ['blue']
+
+# ============================================================
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description='画像内の指定色の長方形領域の緑色輝度プロファイルを抽出してプロットします。'
-    )
-    parser.add_argument(
-        'image_files',
-        nargs='*',
-        help='処理する画像ファイルのパス（複数指定可、省略時はハードコードされたリストを使用）'
-    )
-    parser.add_argument(
-        '--single',
-        action='store_true',
-        help='各ファイルを個別にプロット（デフォルトは複数ファイルを重ねてプロット）'
-    )
-    parser.add_argument(
-        '--colors', '-c',
-        nargs='+',
-        default=None,
-        choices=list(COLOR_RANGES.keys()),
-        help=f'検出する色（複数指定可）。対応色: {", ".join(COLOR_RANGES.keys())}。省略時はハードコード値を使用'
-    )
+    print(f"検出色: {COLORS}")
 
-    args = parser.parse_args()
+    # 辞書形式からタプル形式に変換
+    file_pairs = [(pair['mask'], pair['original']) for pair in image_pairs]
 
-    # 引数がなければハードコードされたリストを使用
-    if args.image_files:
-        image_files = args.image_files
-        single_mode = args.single
-    else:
-        print("引数なし: ハードコードされたファイルリストを使用します")
-        image_files = DEFAULT_IMAGE_FILES
-        single_mode = DEFAULT_SINGLE_MODE
-
-    # 色の設定
-    if args.colors:
-        colors = args.colors
-    else:
-        colors = DEFAULT_COLORS
-    print(f"検出色: {colors}")
-
-    if single_mode or len(image_files) == 1:
+    if SINGLE_MODE or len(file_pairs) == 1:
         # 個別プロットモード
-        for image_file in image_files:
-            print(f"Processing: {image_file}")
-            plot_multi_region_green_intensity_profiles(image_file, colors)
+        for mask_path, original_path in file_pairs:
+            print(f"Processing: mask={mask_path}, original={original_path}")
+            plot_multi_region_green_intensity_profiles(mask_path, original_path, COLORS)
     else:
         # 複数ファイル比較モード
-        plot_multiple_files(image_files, colors)
+        plot_multiple_files(file_pairs, COLORS)
