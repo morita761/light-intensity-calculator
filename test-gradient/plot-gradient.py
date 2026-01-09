@@ -437,7 +437,6 @@ def plot_multiple_files(file_pairs, colors=None):
         print(f"\n検出された長方形を順番に表示します（全{len(debug_images)}枚）")
         show_debug_images_sequential(debug_images)
 
-
 # ============================================================
 # 設定
 # ============================================================
@@ -445,8 +444,8 @@ def plot_multiple_files(file_pairs, colors=None):
 # 画像ペアリスト
 # 形式: [{'original': 元画像パス, 'mask': マスク画像パス}, ...]
 image_pairs = [
-    {'original': './pics/vang/Projections of 20250404_24%APF_Fz-GFP_loco-vang-Cas9P_001_ue.png',
-     'mask': './pics/vang/Projections of 20250404_24%APF_Fz-GFP_loco-vang-Cas9P_001_ue_mask.tif'},
+    {'original': './pics/control/Projections of 20250413_24%APF_Fz2-GFP_fz2-RNAi_001_ue_green.png',
+     'mask': './pics/control/Projections of 20250413_24%APF_Fz2-GFP_fz2-RNAi_001_ue_green-1.png'},
 ]
 
 # 個別プロットモード（True: 各ファイルペアを個別に, False: 重ねてプロット）
@@ -454,10 +453,7 @@ SINGLE_MODE = False
 
 # 検出色（複数指定可）
 # 対応色: blue, yellow, red, green, cyan, magenta
-COLORS = ['blue']
-
-# ============================================================
-
+COLORS = ['blue', 'yellow']
 
 if __name__ == "__main__":
     print(f"検出色: {COLORS}")
