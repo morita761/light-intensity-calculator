@@ -319,6 +319,7 @@ for index, file_info in enumerate(image_pairs):
 average_heatmap_left_normalized = np.zeros(target_size, dtype=np.uint8)
 if all_aligned_gfp_data_left:
     average_heatmap_left = np.mean(np.array(all_aligned_gfp_data_left), axis=0)
+    max_left = np.max(average_heatmap_left)
     average_heatmap_left_normalized = cv2.normalize(average_heatmap_left, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
 else:
     print("左側の有効な馬蹄形が全く検出されませんでした。左側のヒートマップは黒になります。")
@@ -326,7 +327,11 @@ else:
 average_heatmap_right_normalized = np.zeros(target_size, dtype=np.uint8)
 if all_aligned_gfp_data_right:
     average_heatmap_right = np.mean(np.array(all_aligned_gfp_data_right), axis=0)
+    max_right = np.max(average_heatmap_right)
+    global_max = max(max_left, max_right)
     average_heatmap_right_normalized = cv2.normalize(average_heatmap_right, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+    # average_heatmap_left_normalized  = (average_heatmap_left  / global_max * 255).astype(np.uint8)
+    # average_heatmap_right_normalized = (average_heatmap_right / global_max * 255).astype(np.uint8)
 else:
     print("右側の有効な馬蹄形が全く検出されませんでした。右側のヒートマップは黒になります。")
 
