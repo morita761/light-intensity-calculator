@@ -50,82 +50,70 @@ def split_left_right(image):
     return image_center_x
 
 # ----------------------------------------------------
-# 【改善版】凹欠損解析を使った凹の方向を計算する関数 (下=0度、右=90度、左=-90度)
+# 【改善版】PCA（主成分分析）を使った凹の方向を計算する関数 (下=0度、右=90度、左=-90度)
 # ----------------------------------------------------
 def calculate_horseshoe_orientation(contour):
     """
     馬蹄形輪郭から凹（開口部）の方向を推定し、画像下=0度、右=90度、左=-90度の角度を返す。
 
-    ロジック: 凸包(Convex Hull)と元の輪郭の差分（凹欠損）を検出し、
-    最大の凹み位置を開口部として特定する。
+    ロジック: PCA（主成分分析）で輪郭の主軸方向を計算し、
+    輪郭重心とバウンディングボックス中心の関係から開口部の方向（正負）を決定する。
     始点は凸包の重心を使用。
     """
     if len(contour) < 5:
         return None
 
-    # 1. 凸包を計算
-    hull = cv2.convexHull(contour, returnPoints=False)
-    if len(hull) < 3:
-        return None
+    # 1. 輪郭点を2D配列に変換
+    pts = contour.reshape(-1, 2).astype(np.float64)
 
-    # 2. 凹欠損を検出
-    try:
-        defects = cv2.convexityDefects(contour, hull)
-    except cv2.error:
-        return None
+    # 2. PCAを計算
+    mean, eigenvectors = cv2.PCACompute(pts, mean=None)
 
-    if defects is None or len(defects) == 0:
-        return None
+    # 第1主成分（最大分散の方向）
+    pc1 = eigenvectors[0]  # [vx, vy]
 
-    # 3. 最大の凹み（depth が最大）を見つける
-    max_defect_idx = np.argmax(defects[:, 0, 3])
-    max_defect = defects[max_defect_idx, 0]
-
-    # defect: [start_idx, end_idx, farthest_idx, depth]
-    # farthest_idx: 凸包から最も遠い点（凹みの最深部）
-    farthest_idx = max_defect[2]
-    farthest_point = tuple(contour[farthest_idx][0])
-
-    # 4. 凸包の重心を始点として計算
-    hull_points = cv2.convexHull(contour, returnPoints=True)
-    M_hull = cv2.moments(hull_points)
-    if M_hull["m00"] == 0:
-        return None
-
-    # 凸包の重心（始点）
-    cx = int(M_hull["m10"] / M_hull["m00"])
-    cy = int(M_hull["m01"] / M_hull["m00"])
-
-    # 開口部の位置（最大凹み点）
-    defect_x, defect_y = farthest_point
-
-    # 5. 馬蹄形の輪郭の重心を始点として使用（凸包重心ではなく）
+    # 3. 輪郭の重心を計算
     M_contour = cv2.moments(contour)
     if M_contour["m00"] == 0:
         return None
     contour_cx = int(M_contour["m10"] / M_contour["m00"])
     contour_cy = int(M_contour["m01"] / M_contour["m00"])
 
-    # 6. 始点（輪郭重心）から凹欠損点を通過して外側に延長した点を終点とする
-    # 方向ベクトル: 輪郭重心 → 凹欠損点
-    dx = defect_x - contour_cx
-    dy = defect_y - contour_cy
+    # 4. バウンディングボックスの中心を計算
+    x, y, w, h = cv2.boundingRect(contour)
+    bbox_cx = x + w // 2
+    bbox_cy = y + h // 2
 
-    # 凹欠損点を通過して外側に延長（表示用）
-    extend_factor = 2.0
-    fx = int(contour_cx + dx * extend_factor)
-    fy = int(contour_cy + dy * extend_factor)
+    # 5. 開口部の方向を決定（輪郭重心→バウンディングボックス中心の方向）
+    # 馬蹄形の重心は開口部の反対側に寄るため、重心→bbox中心が開口部方向
+    direction_to_opening_x = bbox_cx - contour_cx
+    direction_to_opening_y = bbox_cy - contour_cy
 
-    # 始点は輪郭重心
-    cx = contour_cx
-    cy = contour_cy
+    # 6. PCAの第1主成分の向きを開口部方向に合わせる
+    # 内積が負なら主成分の向きを反転
+    dot_product = pc1[0] * direction_to_opening_x + pc1[1] * direction_to_opening_y
+    if dot_product < 0:
+        pc1 = -pc1
 
-    # 7. 角度の計算: 始点(cx, cy) から 開口部方向(dx, dy) への方向
+    # 7. 凸包の重心を始点として使用（馬蹄形の中央に近い）
+    hull_points = cv2.convexHull(contour, returnPoints=True)
+    M_hull = cv2.moments(hull_points)
+    if M_hull["m00"] == 0:
+        return None
+    cx = int(M_hull["m10"] / M_hull["m00"])
+    cy = int(M_hull["m01"] / M_hull["m00"])
+
+    # 8. 終点を計算（主成分方向に延長）
+    arrow_length = max(w, h) * 0.8  # 矢印の長さ
+    fx = int(cx + pc1[0] * arrow_length)
+    fy = int(cy + pc1[1] * arrow_length)
+
+    # 9. 角度の計算
     # 画像座標系はy軸が下向き正であるため、y座標を反転させて標準的なデカルト座標系に合わせる
-    angle_rad_standard = np.arctan2(-dy, dx)
+    angle_rad_standard = np.arctan2(-pc1[1], pc1[0])
     angle_deg_standard = np.degrees(angle_rad_standard)
 
-    # 8. 座標系の変換: 要件 (下=0度、右=90度)
+    # 10. 座標系の変換: 要件 (下=0度、右=90度)
     orientation_angle = angle_deg_standard + 90
 
     # 角度を [-180, 180] の範囲に正規化
@@ -134,7 +122,7 @@ def calculate_horseshoe_orientation(contour):
     elif orientation_angle <= -180:
         orientation_angle += 360
 
-    # デバッグ表示用: 始点(cx, cy)=輪郭重心、終点(fx, fy)=凹欠損点を通過して延長
+    # デバッグ表示用: 始点(cx, cy)=凸包重心、終点(fx, fy)=PCA主軸方向
     return orientation_angle, cx, cy, fx, fy
 # ----------------------------------------------------
 
