@@ -198,9 +198,15 @@ for index, file_info in enumerate(image_pairs):
                 current_angle_list.append(angle)
                 
                 # デバッグ表示: 重心(白)、開口部(緑)、方向ベクトル(シアン)
-                cv2.circle(debug_img, (cx, cy), 3, (255, 255, 255), -1) 
-                cv2.circle(debug_img, (fx, fy), 3, (0, 255, 0), -1)   
-                cv2.line(debug_img, (cx, cy), (fx, fy), (255, 255, 0), 1) 
+                cv2.circle(debug_img, (cx, cy), 3, (255, 255, 255), -1)
+                cv2.circle(debug_img, (fx, fy), 3, (0, 255, 0), -1)
+                # 矢印を長くするために方向ベクトルを延長
+                arrow_scale = 2.5  # 矢印の長さ倍率
+                dx = fx - cx
+                dy = fy - cy
+                fx_ext = int(cx + dx * arrow_scale)
+                fy_ext = int(cy + dy * arrow_scale)
+                cv2.arrowedLine(debug_img, (cx, cy), (fx_ext, fy_ext), (255, 255, 0), 2, tipLength=0.2) 
 
                 # ----------------------------------------------------
                 # ✨【新規追加】個々の馬蹄形のデバッグ表示
@@ -230,7 +236,12 @@ for index, file_info in enumerate(image_pairs):
 
                 # 5. 切り抜き画像に矢印を描画
                 # 矢印は重心から開口部の方向 (凹の方向) へ
-                cv2.arrowedLine(roi_resized, (cx_disp, cy_disp), (fx_disp, fy_disp), (0, 255, 255), 2, tipLength=0.3)
+                # 矢印を長くするために方向ベクトルを延長
+                dx_disp = fx_disp - cx_disp
+                dy_disp = fy_disp - cy_disp
+                fx_disp_ext = int(cx_disp + dx_disp * arrow_scale)
+                fy_disp_ext = int(cy_disp + dy_disp * arrow_scale)
+                cv2.arrowedLine(roi_resized, (cx_disp, cy_disp), (fx_disp_ext, fy_disp_ext), (0, 255, 255), 2, tipLength=0.2)
                 
                 # 6. 角度テキストの準備
                 angle_text = f"Angle: {angle:.1f}°"
