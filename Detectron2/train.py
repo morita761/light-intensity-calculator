@@ -39,7 +39,8 @@ cfg.DATASETS.TRAIN = ("horseshoe_train",)
 cfg.DATASETS.TEST = ("horseshoe_val",)
 # cfg.DATASETS.TEST = ()
 cfg.DATALOADER.NUM_WORKERS = 2
-cfg.OUTPUT_DIR = "./output"
+# cfg.OUTPUT_DIR = "./output/0922"
+cfg.OUTPUT_DIR = "./output/20260112/"
 
 cfg.SOLVER.IMS_PER_BATCH = 2
 cfg.SOLVER.BASE_LR = 0.0001
@@ -48,6 +49,12 @@ cfg.SOLVER.MAX_ITER = 270000
 cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 128
 cfg.MODEL.ROI_HEADS.NUM_CLASSES = 2  # horseshoe, negative
 cfg.TEST.EVAL_PERIOD = 50 # 50イテレーションごとに評価を実行（任意、デフォルトは0）
+# 例: 1000イテレーションごとにモデルを出力したい場合
+cfg.SOLVER.CHECKPOINT_PERIOD = 1000
+# 以下の設定を追加するか、既存の設定を確認・変更
+# cfg.SOLVER.STEPS = (10000, 15000) # 例: 1万回と1.5万回で学習率を10分の1に減衰
+# 減衰率も確認
+# cfg.SOLVER.GAMMA = 0.1 # 減衰時に学習率が乗算される値 (通常は0.1)
 
 os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
 
@@ -60,10 +67,10 @@ def custom_mapper(dataset_dict):
     augmentations = [
         T.RandomRotation(angle=[-20, 20]),
         T.RandomFlip(prob=0.5, horizontal=True, vertical=False),
-        # ✅ 追加: 明るさのランダム変動
-        T.RandomBrightness(intensity_range=[0.8, 1.2]),
-        # ✅ 追加: コントラストのランダム変動
-        T.RandomContrast(intensity_range=[0.85, 1.15]),
+        # ✅ 明るさ
+        T.RandomBrightness(0.8, 1.2),
+        # ✅ コントラスト
+        T.RandomContrast(0.85, 1.15),
         T.ResizeShortestEdge([640, 800], max_size=1333),
     ]
 
@@ -137,6 +144,12 @@ class CustomTrainer(DefaultTrainer):
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # BGRをRGBに変換 (Visualizer向け)
 
             print(f"画像 {i+1} のアノテーション数: {len(data_dict['instances'])}")
+
+            if data_dict['instances'].has("gt_masks"):
+                 print(f"gt_masksの型: {type(data_dict['instances'].gt_masks)}")
+            else:
+                print("Instancesオブジェクトに 'gt_masks' フィールドがありません。")
+
             # Visualizerを初期化
             visualizer = Visualizer(
                 image, 
@@ -153,11 +166,11 @@ class CustomTrainer(DefaultTrainer):
             cv2.imshow(window_name, vis.get_image()[:, :, ::-1])
             print(f"画像 {i+1} を表示しました。")
 
-    # すべてのウィンドウが表示されるまで待機し、キーが押されたら終了
-    print("表示ウィンドウを閉じるには、任意のキーを押してください...")
-    cv2.waitKey(0) 
-    cv2.destroyAllWindows()
-    print("--- デバッグ終了 ---")
+        # すべてのウィンドウが表示されるまで待機し、キーが押されたら終了
+        print("表示ウィンドウを閉じるには、任意のキーを押してください...")
+        cv2.waitKey(0) 
+        cv2.destroyAllWindows()
+        print("--- デバッグ終了 ---")
 
     def build_train_loader(self, cfg):
         # デバッグフラグ (学習開始前に一度だけ実行)
@@ -175,8 +188,8 @@ class CustomTrainer(DefaultTrainer):
 if __name__ == "__main__":
     trainer = CustomTrainer(cfg)
     # trainer = DefaultTrainer(cfg)
-    trainer.resume_or_load(resume=True) # 必要に応じて以前のチェックポイントから再開
+    # trainer.resume_or_load(resume=True) # 必要に応じて以前のチェックポイントから再開
     trainer.train() # トレーニングを開始
 
     # print("データ拡張の確認を実行します。学習は開始されません。") # 拡張結果だけを見たい場合に実行
-    # CustomTrainer.debug_data_augmentation(cfg)  # コメントを外す
+    # CustomTrainer.debug_data_augmentation(cfg)               # コメントを外す

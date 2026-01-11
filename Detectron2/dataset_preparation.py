@@ -6,55 +6,71 @@ from PIL import Image
 import glob
 
 
+# アノテーションに使用する色のHSV範囲を定義
+ANNOTATION_COLORS_HSV = {
+    "red": {
+        "lower": np.array([0, 100, 100]),
+        "upper": np.array([10, 255, 255]),
+        "lower2": np.array([170, 100, 100]),
+        "upper2": np.array([180, 255, 255])
+    },
+    "blue": {
+        "lower": np.array([100, 100, 100]),
+        "upper": np.array([130, 255, 255])
+    },
+    "cyan": {
+        "lower": np.array([85, 100, 100]),
+        "upper": np.array([100, 255, 255])
+    },
+    "magenta": {
+        "lower": np.array([140, 100, 100]),
+        "upper": np.array([170, 255, 255])
+    }
+}
+
+def extract_color_mask(mask_image_bgr, color_name):
+    """指定された色のHSV範囲に基づいてマスクを抽出する"""
+    hsv = cv2.cvtColor(mask_image_bgr, cv2.COLOR_BGR2HSV)
+    color_ranges = ANNOTATION_COLORS_HSV[color_name]
+
+    mask1 = cv2.inRange(hsv, color_ranges["lower"], color_ranges["upper"])
+    if "lower2" in color_ranges: # 赤のようにHueが2つの範囲にまたがる場合
+        mask2 = cv2.inRange(hsv, color_ranges["lower2"], color_ranges["upper2"])
+        final_mask = cv2.bitwise_or(mask1, mask2)
+    else:
+        final_mask = mask1
+    return final_mask
+
 def extract_color_masks(mask_path):
     """
     マスク画像から色別にマスクを抽出
-    - 赤色 → negative (category_id: 1)
-    - 青色、緑色、黄色 → horseshoe (category_id: 0)
+
+    - blue, cyan → horseshoe (category_id: 0)
+    - magenta → negative (category_id: 1)
 
     Returns:
         list of (mask, category_id) tuples
     """
-    mask = cv2.imread(mask_path)
-    if mask is None:
+    mask_bgr = cv2.imread(mask_path)
+    if mask_bgr is None:
         print(f"⚠️ マスク画像を読み込めません: {mask_path}")
         return []
 
-    hsv = cv2.cvtColor(mask, cv2.COLOR_BGR2HSV)
-
     masks_with_categories = []
 
-    # 赤色（HSVで色相が0-10または170-180）→ negative
-    lower_red1 = np.array([0, 100, 100])
-    upper_red1 = np.array([10, 255, 255])
-    lower_red2 = np.array([170, 100, 100])
-    upper_red2 = np.array([180, 255, 255])
-    red_mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
-    red_mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
-    red_mask = cv2.bitwise_or(red_mask1, red_mask2)
-    if np.any(red_mask):
-        masks_with_categories.append((red_mask, 1))  # negative
+    # 色名 → category_id の対応
+    color_to_category = {
+        "red": 1,       # negative
+        "blue": 0,      # horseshoe
+        "cyan": 0,      # horseshoe
+        "magenta": 0,   # horseshoe
+    }
 
-    # 青色（HSVで色相が100-130）→ horseshoe
-    lower_blue = np.array([100, 100, 100])
-    upper_blue = np.array([130, 255, 255])
-    blue_mask = cv2.inRange(hsv, lower_blue, upper_blue)
-    if np.any(blue_mask):
-        masks_with_categories.append((blue_mask, 0))  # horseshoe
+    for color_name, category_id in color_to_category.items():
+        color_mask = extract_color_mask(mask_bgr, color_name)
 
-    # 緑色（HSVで色相が40-80）→ horseshoe
-    lower_green = np.array([40, 100, 100])
-    upper_green = np.array([80, 255, 255])
-    green_mask = cv2.inRange(hsv, lower_green, upper_green)
-    if np.any(green_mask):
-        masks_with_categories.append((green_mask, 0))  # horseshoe
-
-    # 黄色（HSVで色相が20-40）→ horseshoe
-    lower_yellow = np.array([20, 100, 100])
-    upper_yellow = np.array([40, 255, 255])
-    yellow_mask = cv2.inRange(hsv, lower_yellow, upper_yellow)
-    if np.any(yellow_mask):
-        masks_with_categories.append((yellow_mask, 0))  # horseshoe
+        if np.any(color_mask):
+            masks_with_categories.append((color_mask, category_id))
 
     return masks_with_categories
 
