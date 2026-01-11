@@ -125,25 +125,33 @@ def calculate_horseshoe_orientation(contour):
     midpoint_x = midpoint_local_x + x - padding
     midpoint_y = midpoint_local_y + y - padding
 
-    # 6. 凸包の重心を始点として計算
+    # 6. 凸包の重心を計算
     hull_points = cv2.convexHull(contour, returnPoints=True)
     M_hull = cv2.moments(hull_points)
     if M_hull["m00"] == 0:
         return None
-    cx = int(M_hull["m10"] / M_hull["m00"])
-    cy = int(M_hull["m01"] / M_hull["m00"])
+    hull_cx = int(M_hull["m10"] / M_hull["m00"])
+    hull_cy = int(M_hull["m01"] / M_hull["m00"])
 
     # 7. 方向ベクトル: 凸包重心 → 端点中点（開口部方向）
-    dx = midpoint_x - cx
-    dy = midpoint_y - cy
+    dx = midpoint_x - hull_cx
+    dy = midpoint_y - hull_cy
 
-    # 8. 終点を計算（方向を延長）
-    arrow_length = max(w, h) * 0.8
     norm = np.sqrt(dx**2 + dy**2)
     if norm < 1e-6:
         return None
-    fx = int(cx + (dx / norm) * arrow_length)
-    fy = int(cy + (dy / norm) * arrow_length)
+
+    # 正規化
+    dx_norm = dx / norm
+    dy_norm = dy / norm
+
+    # 8. 始点を端点中点に設定し、そこから外側へ矢印を延ばす
+    cx = int(midpoint_x)
+    cy = int(midpoint_y)
+
+    arrow_length = max(w, h) * 0.6
+    fx = int(cx + dx_norm * arrow_length)
+    fy = int(cy + dy_norm * arrow_length)
 
     # 9. 角度の計算
     angle_rad_standard = np.arctan2(-dy, dx)
