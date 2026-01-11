@@ -5,6 +5,7 @@ import seaborn as sns
 import sys
 import os
 import matplotlib.gridspec as gridspec
+from skimage.morphology import skeletonize
 
 # 除外する中心線の幅を定義 30ピクセル
 EXCLUSION_WIDTH = 50
@@ -50,52 +51,81 @@ def split_left_right(image):
     return image_center_x
 
 # ----------------------------------------------------
-# 【改善版】PCA（主成分分析）を使った凹の方向を計算する関数 (下=0度、右=90度、左=-90度)
+# 【改善版】骨格化を使った凹の方向を計算する関数 (下=0度、右=90度、左=-90度)
 # ----------------------------------------------------
+def find_skeleton_endpoints(skeleton):
+    """骨格画像から端点を検出する"""
+    endpoints = []
+    rows, cols = skeleton.shape
+
+    for i in range(1, rows - 1):
+        for j in range(1, cols - 1):
+            if skeleton[i, j]:
+                # 8近傍の接続数をカウント
+                neighbors = skeleton[i-1:i+2, j-1:j+2].sum() - 1  # 自分自身を除く
+                if neighbors == 1:  # 端点は接続が1つだけ
+                    endpoints.append((j, i))  # (x, y)形式
+
+    return endpoints
+
 def calculate_horseshoe_orientation(contour):
     """
     馬蹄形輪郭から凹（開口部）の方向を推定し、画像下=0度、右=90度、左=-90度の角度を返す。
 
-    ロジック: PCA（主成分分析）で輪郭の主軸方向を計算し、
-    輪郭重心とバウンディングボックス中心の関係から開口部の方向（正負）を決定する。
-    始点は凸包の重心を使用。
+    ロジック: U字形を骨格化（スケルトン化）して1本の曲線にし、
+    その端点から開口部方向を推定する。
     """
     if len(contour) < 5:
         return None
 
-    # 1. 輪郭点を2D配列に変換
-    pts = contour.reshape(-1, 2).astype(np.float64)
-
-    # 2. PCAを計算
-    mean, eigenvectors = cv2.PCACompute(pts, mean=None)
-
-    # 第1主成分（最大分散の方向）
-    pc1 = eigenvectors[0]  # [vx, vy]
-
-    # 3. 輪郭の重心を計算
-    M_contour = cv2.moments(contour)
-    if M_contour["m00"] == 0:
-        return None
-    contour_cx = int(M_contour["m10"] / M_contour["m00"])
-    contour_cy = int(M_contour["m01"] / M_contour["m00"])
-
-    # 4. バウンディングボックスの中心を計算
+    # 1. バウンディングボックスを取得
     x, y, w, h = cv2.boundingRect(contour)
-    bbox_cx = x + w // 2
-    bbox_cy = y + h // 2
 
-    # 5. 開口部の方向を決定（輪郭重心→バウンディングボックス中心の方向）
-    # 馬蹄形の重心は開口部の反対側に寄るため、重心→bbox中心が開口部方向
-    direction_to_opening_x = bbox_cx - contour_cx
-    direction_to_opening_y = bbox_cy - contour_cy
+    # パディングを追加（骨格化の精度向上のため）
+    padding = 5
+    mask_w = w + 2 * padding
+    mask_h = h + 2 * padding
 
-    # 6. PCAの第1主成分の向きを開口部方向に合わせる
-    # 内積が負なら主成分の向きを反転
-    dot_product = pc1[0] * direction_to_opening_x + pc1[1] * direction_to_opening_y
-    if dot_product < 0:
-        pc1 = -pc1
+    # 2. 輪郭を塗りつぶしたマスクを作成
+    mask = np.zeros((mask_h, mask_w), dtype=np.uint8)
+    shifted_contour = contour - np.array([x - padding, y - padding])
+    cv2.drawContours(mask, [shifted_contour], -1, 255, cv2.FILLED)
 
-    # 7. 凸包の重心を始点として使用（馬蹄形の中央に近い）
+    # 3. 骨格化（スケルトン化）
+    skeleton = skeletonize(mask > 0)
+
+    # 4. 骨格の端点を検出
+    endpoints = find_skeleton_endpoints(skeleton)
+
+    if len(endpoints) < 2:
+        # 端点が2つ未満の場合は元のアルゴリズムにフォールバック
+        return fallback_orientation(contour)
+
+    # 5. 端点の中点を計算（U字の開口部の中心）
+    # 端点が2つ以上ある場合、最も離れた2点を選ぶ
+    if len(endpoints) == 2:
+        ep1, ep2 = endpoints[0], endpoints[1]
+    else:
+        # 最も離れた2点を見つける
+        max_dist = 0
+        ep1, ep2 = endpoints[0], endpoints[1]
+        for i in range(len(endpoints)):
+            for j in range(i + 1, len(endpoints)):
+                dist = np.sqrt((endpoints[i][0] - endpoints[j][0])**2 +
+                               (endpoints[i][1] - endpoints[j][1])**2)
+                if dist > max_dist:
+                    max_dist = dist
+                    ep1, ep2 = endpoints[i], endpoints[j]
+
+    # 端点の中点（ローカル座標）
+    midpoint_local_x = (ep1[0] + ep2[0]) / 2
+    midpoint_local_y = (ep1[1] + ep2[1]) / 2
+
+    # グローバル座標に変換
+    midpoint_x = midpoint_local_x + x - padding
+    midpoint_y = midpoint_local_y + y - padding
+
+    # 6. 凸包の重心を始点として計算
     hull_points = cv2.convexHull(contour, returnPoints=True)
     M_hull = cv2.moments(hull_points)
     if M_hull["m00"] == 0:
@@ -103,14 +133,20 @@ def calculate_horseshoe_orientation(contour):
     cx = int(M_hull["m10"] / M_hull["m00"])
     cy = int(M_hull["m01"] / M_hull["m00"])
 
-    # 8. 終点を計算（主成分方向に延長）
-    arrow_length = max(w, h) * 0.8  # 矢印の長さ
-    fx = int(cx + pc1[0] * arrow_length)
-    fy = int(cy + pc1[1] * arrow_length)
+    # 7. 方向ベクトル: 凸包重心 → 端点中点（開口部方向）
+    dx = midpoint_x - cx
+    dy = midpoint_y - cy
+
+    # 8. 終点を計算（方向を延長）
+    arrow_length = max(w, h) * 0.8
+    norm = np.sqrt(dx**2 + dy**2)
+    if norm < 1e-6:
+        return None
+    fx = int(cx + (dx / norm) * arrow_length)
+    fy = int(cy + (dy / norm) * arrow_length)
 
     # 9. 角度の計算
-    # 画像座標系はy軸が下向き正であるため、y座標を反転させて標準的なデカルト座標系に合わせる
-    angle_rad_standard = np.arctan2(-pc1[1], pc1[0])
+    angle_rad_standard = np.arctan2(-dy, dx)
     angle_deg_standard = np.degrees(angle_rad_standard)
 
     # 10. 座標系の変換: 要件 (下=0度、右=90度)
@@ -122,7 +158,40 @@ def calculate_horseshoe_orientation(contour):
     elif orientation_angle <= -180:
         orientation_angle += 360
 
-    # デバッグ表示用: 始点(cx, cy)=凸包重心、終点(fx, fy)=PCA主軸方向
+    return orientation_angle, cx, cy, fx, fy
+
+def fallback_orientation(contour):
+    """端点検出に失敗した場合のフォールバック（元のアルゴリズム）"""
+    M = cv2.moments(contour)
+    if M["m00"] == 0:
+        return None
+
+    cx = int(M["m10"] / M["m00"])
+    cy = int(M["m01"] / M["m00"])
+
+    x, y, w, h = cv2.boundingRect(contour)
+    bx = x + w // 2
+    by = y + h // 2
+
+    angle_rad_standard = np.arctan2(cy - by, bx - cx)
+    angle_deg_standard = np.degrees(angle_rad_standard)
+
+    orientation_angle = angle_deg_standard + 90
+
+    if orientation_angle > 180:
+        orientation_angle -= 360
+    elif orientation_angle <= -180:
+        orientation_angle += 360
+
+    arrow_length = max(w, h) * 0.8
+    dx = bx - cx
+    dy = by - cy
+    norm = np.sqrt(dx**2 + dy**2)
+    if norm < 1e-6:
+        return None
+    fx = int(cx + (dx / norm) * arrow_length)
+    fy = int(cy + (dy / norm) * arrow_length)
+
     return orientation_angle, cx, cy, fx, fy
 # ----------------------------------------------------
 
