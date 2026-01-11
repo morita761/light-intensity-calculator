@@ -97,14 +97,35 @@ def calculate_horseshoe_orientation(contour):
     cy = int(M_hull["m01"] / M_hull["m00"])
 
     # 開口部の位置（最大凹み点）
-    fx, fy = farthest_point
+    defect_x, defect_y = farthest_point
 
-    # 5. 角度の計算: 始点(cx, cy) から 開口部(fx, fy) への方向
+    # 5. 馬蹄形の輪郭の重心を始点として使用（凸包重心ではなく）
+    M_contour = cv2.moments(contour)
+    if M_contour["m00"] == 0:
+        return None
+    contour_cx = int(M_contour["m10"] / M_contour["m00"])
+    contour_cy = int(M_contour["m01"] / M_contour["m00"])
+
+    # 6. 始点（輪郭重心）から凹欠損点を通過して外側に延長した点を終点とする
+    # 方向ベクトル: 輪郭重心 → 凹欠損点
+    dx = defect_x - contour_cx
+    dy = defect_y - contour_cy
+
+    # 凹欠損点を通過して外側に延長（表示用）
+    extend_factor = 2.0
+    fx = int(contour_cx + dx * extend_factor)
+    fy = int(contour_cy + dy * extend_factor)
+
+    # 始点は輪郭重心
+    cx = contour_cx
+    cy = contour_cy
+
+    # 7. 角度の計算: 始点(cx, cy) から 開口部方向(dx, dy) への方向
     # 画像座標系はy軸が下向き正であるため、y座標を反転させて標準的なデカルト座標系に合わせる
-    angle_rad_standard = np.arctan2(cy - fy, fx - cx)
+    angle_rad_standard = np.arctan2(-dy, dx)
     angle_deg_standard = np.degrees(angle_rad_standard)
 
-    # 6. 座標系の変換: 要件 (下=0度、右=90度)
+    # 8. 座標系の変換: 要件 (下=0度、右=90度)
     orientation_angle = angle_deg_standard + 90
 
     # 角度を [-180, 180] の範囲に正規化
@@ -113,7 +134,7 @@ def calculate_horseshoe_orientation(contour):
     elif orientation_angle <= -180:
         orientation_angle += 360
 
-    # デバッグ表示用: 始点(cx, cy)=凸包重心、終点(fx, fy)=最大凹み点
+    # デバッグ表示用: 始点(cx, cy)=輪郭重心、終点(fx, fy)=凹欠損点を通過して延長
     return orientation_angle, cx, cy, fx, fy
 # ----------------------------------------------------
 
