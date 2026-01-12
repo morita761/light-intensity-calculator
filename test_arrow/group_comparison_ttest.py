@@ -24,7 +24,11 @@ from collections import deque
 # =============================================================================
 
 # 除外する中心線の幅を定義
-EXCLUSION_WIDTH = 50
+EXCLUSION_WIDTH = 80
+
+# 極座標ヒストグラムのビンの幅 (-0.5° ~ 0.5°にするため)
+BIN_WIDTH_DEG = 10.0        # -5°〜+5°
+BIN_NUM = int(360 / BIN_WIDTH_DEG)+1  # 180
 
 # アノテーションに使用する色のHSV範囲を定義
 ANNOTATION_COLORS_HSV = {
@@ -56,6 +60,10 @@ CONTROL_FILES = [
      'mask': './pics/R8control/Projections of 20251119_25d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi.nd2...5d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi_r_h_mask.tif'},
 ]
 
+# CONTROL_FILES = [
+#     {'original': './pics/29d_R8control/Projections of 20251022_29degree_20h_senslexAlexOPmCherry_Cas9_no_sgRNA.png', 
+#      'mask': './pics/29d_R8control/Projections of 20251022_29degree_20h_senslexAlexOPmCherry_Cas9_no_sgRNA_mask.tif'},
+# ]
 # Test群のファイルリスト
 TEST_FILES = [
     {'original': './pics/R8ori/Projections of 20251105_25degree_24hours_senslexAlexOP_loco_vang_cas9001.nd2...5degree_24hours_senslexAlexOP_loco_vang_cas9001.png',
@@ -67,6 +75,10 @@ TEST_FILES = [
     {'original': './pics/R8ori/Projections of 20251129_25d_22h_test_sensmCherry_loco_vang_cas9001.nd2-20251129_25d_22h_test_sensmCherry_loco_vang_cas9001.png',
      'mask': './pics/R8ori/Projections of 20251129_25d_22h_test_sensmCherry_loco_vang_cas9001.nd2-20251129_25d_22h_test_sensmCherry_loco_vang_cas9001_mask.tif'},
 ]
+# TEST_FILES = [
+#     {'original': './pics/29d_R8ori/Projections of 20251014_29degree_21hours_loco-Cas9-vang_R8_mCherry.png', 
+#      'mask': './pics/29d_R8ori/Projections of 20251014_29degree_21hours_loco-Cas9-vang_R8_mCherry_mask.tif'},
+# ]
 
 # =============================================================================
 # Helper Functions (from detect_arrow_improved.py)
@@ -428,7 +440,7 @@ def print_ttest_results(ventral_result, dorsal_result):
               f"mean={result['test_mean']:.2f}°, "
               f"std={result['test_std']:.2f}°")
         print(f"  t-statistic = {result['t_statistic']:.4f}")
-        print(f"  p-value = {result['p_value']:.6f}", end="")
+        print(f"  p-value = {result['p_value']:.10f}", end="")
 
         if result['p_value'] < 0.001:
             print(" ***")
@@ -459,7 +471,7 @@ def plot_results(control_data, test_data, ventral_result, dorsal_result):
                   f"mean={ventral_result['control_mean']:.1f}° ± {ventral_result['control_std']:.1f}°\n"
                   f"Test: n={ventral_result['test_n']}, "
                   f"mean={ventral_result['test_mean']:.1f}° ± {ventral_result['test_std']:.1f}°\n"
-                  f"p = {ventral_result['p_value']:.4f}")
+                  f"p = {ventral_result['p_value']:.10f}")
     ax1.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
     ax1.set_ylim(-180, 180)
 
@@ -478,7 +490,7 @@ def plot_results(control_data, test_data, ventral_result, dorsal_result):
                   f"mean={dorsal_result['control_mean']:.1f}° ± {dorsal_result['control_std']:.1f}°\n"
                   f"Test: n={dorsal_result['test_n']}, "
                   f"mean={dorsal_result['test_mean']:.1f}° ± {dorsal_result['test_std']:.1f}°\n"
-                  f"p = {dorsal_result['p_value']:.4f}")
+                  f"p = {dorsal_result['p_value']:.10f}")
     ax2.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
     ax2.set_ylim(-180, 180)
 
@@ -487,7 +499,7 @@ def plot_results(control_data, test_data, ventral_result, dorsal_result):
     # =================================
     ax3 = fig.add_subplot(2, 2, 3, projection='polar')
 
-    bin_edges = np.linspace(-np.pi, np.pi, 37)
+    bin_edges = np.linspace(-np.pi, np.pi, BIN_NUM, endpoint=False)
 
     if control_data['ventral']:
         ctrl_rad = np.radians(control_data['ventral'])

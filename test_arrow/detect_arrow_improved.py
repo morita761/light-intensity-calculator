@@ -318,6 +318,7 @@ def fallback_orientation(contour):
 # ----------------------------------------------------
 
 # --- メイン処理 ---
+title = "Control"
 image_pairs = [
     {'original': './pics/R8control/Projections of 20251105_25degree_24hours_senslexAlexOP_loco_cas9_contorl.nd2...5degree_24hours_senslexAlexOP_loco_cas9_contorl_r_image.png', 
      'mask': './pics/R8control/Projections of 20251105_25degree_24hours_senslexAlexOP_loco_cas9_contorl.nd2...5degree_24hours_senslexAlexOP_loco_cas9_contorl_r_image_mask.tif'},
@@ -327,6 +328,7 @@ image_pairs = [
      'mask': './pics/R8control/Projections of 20251119_25d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi.nd2...5d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi_r_h_mask.tif'},
 ]
 
+# title = "Vang KO in Glia"
 # image_pairs = [
 #     {'original': './pics/R8ori/Projections of 20251105_25degree_24hours_senslexAlexOP_loco_vang_cas9001.nd2...5degree_24hours_senslexAlexOP_loco_vang_cas9001.png', 
 #      'mask': './pics/R8ori/Projections of 20251105_25degree_24hours_senslexAlexOP_loco_vang_cas9001.nd2...5degree_24hours_senslexAlexOP_loco_vang_cas9001_mask.tif'},
@@ -336,6 +338,18 @@ image_pairs = [
 #      'mask': './pics/R8ori/Projections of 20251129_25d_22h_senslexAlexOPmCherry_loco_vang_cas9.nd2-20251129_25d_22h_senslexAlexOPmCherry_loco_vang_cas9_mask.tif'},
 #     {'original': './pics/R8ori/Projections of 20251129_25d_22h_test_sensmCherry_loco_vang_cas9001.nd2-20251129_25d_22h_test_sensmCherry_loco_vang_cas9001.png', 
 #      'mask': './pics/R8ori/Projections of 20251129_25d_22h_test_sensmCherry_loco_vang_cas9001.nd2-20251129_25d_22h_test_sensmCherry_loco_vang_cas9001_mask.tif'},
+# ]
+
+# title = "Control (29℃)"
+# image_pairs = [
+#     {'original': './pics/29d_R8ori/Projections of 20251014_29degree_21hours_loco-Cas9-vang_R8_mCherry.png', 
+#      'mask': './pics/29d_R8ori/Projections of 20251014_29degree_21hours_loco-Cas9-vang_R8_mCherry_mask.tif'},
+# ]
+
+# title = "Vang KO in Glia (29℃)"
+# image_pairs = [
+#     {'original': './pics/29d_R8control/Projections of 20251022_29degree_20h_senslexAlexOPmCherry_Cas9_no_sgRNA.png', 
+#      'mask': './pics/29d_R8control/Projections of 20251022_29degree_20h_senslexAlexOPmCherry_Cas9_no_sgRNA_mask.tif'},
 # ]
 
 # image_pairs = [
@@ -524,7 +538,7 @@ for index, file_info in enumerate(image_pairs):
                 white_pixels = cv2.countNonZero(contour_mask_local)
                 occupancy_rate = white_pixels / total_pixels if total_pixels > 0 else 0
                 
-                if occupancy_rate > 0.60 or iterations >= 4:
+                if occupancy_rate > 0.30 or iterations >= 4:
                     break
 
                 contour_mask_local = cv2.dilate(contour_mask_local, kernel, iterations=1)
@@ -543,6 +557,13 @@ for index, file_info in enumerate(image_pairs):
 
     debug_images.append(debug_img)
     print(f"'{original_file_name}' から左側の有効な馬蹄形が {valid_horseshoe_count_left} 個、右側の有効な馬蹄形が {valid_horseshoe_count_right} 個検出されました。")
+
+    debug_img_rgb = cv2.cvtColor(debug_img, cv2.COLOR_BGR2RGB)
+    plt.figure()
+    plt.imshow(debug_img_rgb)
+    plt.title(title)
+    plt.axis("off")
+    plt.show()
 
 cv2.waitKey(0) 
 cv2.destroyAllWindows()
