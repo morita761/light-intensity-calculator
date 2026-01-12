@@ -631,18 +631,19 @@ if left_horseshoe_angles:
     width = np.diff(bin_edges)
 
     # 正規化: count → probability
-    prob = counts / counts.sum() if counts.sum() > 0 else counts
+    prob_left = counts / counts.sum() if counts.sum() > 0 else counts
 
-    bars = ax_left.bar(centers, prob, width=width, color='magenta', alpha=0.6, bottom=0)
+    bars = ax_left.bar(centers, prob_left, width=width, color='magenta', alpha=0.6, bottom=0)
 
     ax_left.set_theta_zero_location("S")
-    ax_left.set_rlim(0, 1)  # 確率なので0-1固定
+    # r軸の最大値は後で左右の最大値から決定
 
     ax_left.set_xticks(np.radians([0, 90, 180, 270]))
     ax_left.set_xticklabels(['0°', '90°', '180°', ' -90°'])
     ax_left.set_rlabel_position(135)
     ax_left.set_title(f'Ventral (n={len(left_horseshoe_angles)})', va='bottom')
 else:
+    prob_left = np.array([0])
     ax_left.text(0, 0, 'No data', ha='center', va='center', transform=ax_left.transAxes)
 
 # 右側の極座標ヒストグラム（正規化: probability）
@@ -655,19 +656,27 @@ if right_horseshoe_angles:
     width = np.diff(bin_edges)
 
     # 正規化: count → probability
-    prob = counts / counts.sum() if counts.sum() > 0 else counts
+    prob_right = counts / counts.sum() if counts.sum() > 0 else counts
 
-    bars = ax_right.bar(centers, prob, width=width, color='blue', alpha=0.6, bottom=0)
+    bars = ax_right.bar(centers, prob_right, width=width, color='blue', alpha=0.6, bottom=0)
 
     ax_right.set_theta_zero_location("S")
-    ax_right.set_rlim(0, 1)  # 確率なので0-1固定
+    # r軸の最大値は後で左右の最大値から決定
 
     ax_right.set_xticks(np.radians([0, 90, 180, 270]))
     ax_right.set_xticklabels(['0°', '90°', '180°', ' -90°'])
     ax_right.set_rlabel_position(135)
     ax_right.set_title(f'Dorsal (n={len(right_horseshoe_angles)})', va='bottom')
 else:
+    prob_right = np.array([0])
     ax_right.text(0, 0, 'No data', ha='center', va='center', transform=ax_right.transAxes)
+
+# 左右のr軸を統一（最大確率に基づく）
+max_prob = max(prob_left.max() if len(prob_left) > 0 else 0,
+               prob_right.max() if len(prob_right) > 0 else 0)
+r_max = max_prob * 1.1 if max_prob > 0 else 1  # 少し余裕を持たせる
+ax_left.set_rlim(0, r_max)
+ax_right.set_rlim(0, r_max)
 
 plt.tight_layout()
 plt.show()
