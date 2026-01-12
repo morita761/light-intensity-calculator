@@ -5,7 +5,6 @@ import seaborn as sns
 import sys
 import os
 import matplotlib.gridspec as gridspec
-from skimage.morphology import skeletonize
 
 # 除外する中心線の幅を定義 30ピクセル
 EXCLUSION_WIDTH = 50
@@ -51,101 +50,122 @@ def split_left_right(image):
     return image_center_x
 
 # ----------------------------------------------------
-# 【改善版】骨格化を使った凹の方向を計算する関数 (下=0度、右=90度、左=-90度)
+# 【改善版】輪郭1Dパラメータ化を使った凹の方向を計算する関数 (下=0度、右=90度、左=-90度)
 # ----------------------------------------------------
-def find_skeleton_endpoints(skeleton):
-    """骨格画像から端点を検出する"""
-    endpoints = []
-    rows, cols = skeleton.shape
+def find_opening_endpoints_by_contour(contour):
+    """
+    輪郭の1Dパラメータ化により、馬蹄形の開口部端点を検出する。
 
-    for i in range(1, rows - 1):
-        for j in range(1, cols - 1):
-            if skeleton[i, j]:
-                # 8近傍の接続数をカウント
-                neighbors = skeleton[i-1:i+2, j-1:j+2].sum() - 1  # 自分自身を除く
-                if neighbors == 1:  # 端点は接続が1つだけ
-                    endpoints.append((j, i))  # (x, y)形式
+    アルゴリズム:
+    1. 輪郭点を弧長順に取得（閉曲線として扱う）
+    2. 凸包の重心を計算
+    3. 各輪郭点から重心までの距離を計算（距離プロファイル）
+    4. 距離が大きい連続領域 = 開口部
+    5. その領域の両端を開口部端点として返す
+    """
+    # 輪郭を (N, 2) 形式に変換
+    pts = contour.reshape(-1, 2).astype(np.float64)
+    n = len(pts)
 
-    return endpoints
+    if n < 10:
+        return None
+
+    # 凸包の重心を計算
+    hull_points = cv2.convexHull(contour, returnPoints=True)
+    M_hull = cv2.moments(hull_points)
+    if M_hull["m00"] == 0:
+        return None
+    hull_cx = M_hull["m10"] / M_hull["m00"]
+    hull_cy = M_hull["m01"] / M_hull["m00"]
+
+    # 各輪郭点から重心までの距離を計算
+    distances = np.sqrt((pts[:, 0] - hull_cx)**2 + (pts[:, 1] - hull_cy)**2)
+
+    # 距離の閾値を設定（中央値より上の点を「遠い」と判定）
+    threshold = np.percentile(distances, 60)
+
+    # 閾値以上の点をマーク
+    is_far = distances >= threshold
+
+    # 連続する「遠い」領域を検出（閉曲線なので循環を考慮）
+    # まず、is_far配列を2倍にして循環を処理
+    is_far_extended = np.concatenate([is_far, is_far])
+
+    # 連続領域を検出
+    regions = []
+    in_region = False
+    start_idx = 0
+
+    for i in range(len(is_far_extended)):
+        if is_far_extended[i] and not in_region:
+            in_region = True
+            start_idx = i
+        elif not is_far_extended[i] and in_region:
+            in_region = False
+            end_idx = i - 1
+            # n を超える領域は最初の n 点に収まる部分のみ考慮
+            if start_idx < n:
+                regions.append((start_idx, end_idx, end_idx - start_idx + 1))
+
+    # 最後の領域が閉じていない場合
+    if in_region and start_idx < n:
+        regions.append((start_idx, len(is_far_extended) - 1, len(is_far_extended) - start_idx))
+
+    if not regions:
+        return None
+
+    # 最も長い連続領域を選択
+    regions.sort(key=lambda x: x[2], reverse=True)
+    best_region = regions[0]
+    start, end, length = best_region
+
+    # 領域の両端のインデックスを取得（循環を考慮）
+    start_idx = start % n
+    end_idx = end % n
+
+    # 端点の座標を取得
+    ep1 = pts[start_idx]
+    ep2 = pts[end_idx]
+
+    return ep1, ep2, (hull_cx, hull_cy)
+
 
 def calculate_horseshoe_orientation(contour):
     """
     馬蹄形輪郭から凹（開口部）の方向を推定し、画像下=0度、右=90度、左=-90度の角度を返す。
 
-    ロジック: U字形を骨格化（スケルトン化）して1本の曲線にし、
-    その端点から開口部方向を推定する。
+    ロジック: 輪郭の1Dパラメータ化により開口部の端点を検出し、
+    凸包重心→端点中点の方向ベクトルで向きを計算する。
     """
     if len(contour) < 5:
         return None
 
-    # 1. バウンディングボックスを取得
-    x, y, w, h = cv2.boundingRect(contour)
+    # 1. 輪郭ベースで開口部端点を検出
+    result = find_opening_endpoints_by_contour(contour)
 
-    # パディングを追加（骨格化の精度向上のため）
-    padding = 5
-    mask_w = w + 2 * padding
-    mask_h = h + 2 * padding
-
-    # 2. 輪郭を塗りつぶしたマスクを作成
-    mask = np.zeros((mask_h, mask_w), dtype=np.uint8)
-    shifted_contour = contour - np.array([x - padding, y - padding])
-    cv2.drawContours(mask, [shifted_contour], -1, 255, cv2.FILLED)
-
-    # 3. 骨格化（スケルトン化）
-    skeleton = skeletonize(mask > 0)
-
-    # 4. 骨格の端点を検出
-    endpoints = find_skeleton_endpoints(skeleton)
-
-    if len(endpoints) < 2:
-        # 端点が2つ未満の場合は元のアルゴリズムにフォールバック
+    if result is None:
         return fallback_orientation(contour)
 
-    # 5. 端点の中点を計算（U字の開口部の中心）
-    # 端点が2つ以上ある場合、最も離れた2点を選ぶ
-    if len(endpoints) == 2:
-        ep1, ep2 = endpoints[0], endpoints[1]
-    else:
-        # 最も離れた2点を見つける
-        max_dist = 0
-        ep1, ep2 = endpoints[0], endpoints[1]
-        for i in range(len(endpoints)):
-            for j in range(i + 1, len(endpoints)):
-                dist = np.sqrt((endpoints[i][0] - endpoints[j][0])**2 +
-                               (endpoints[i][1] - endpoints[j][1])**2)
-                if dist > max_dist:
-                    max_dist = dist
-                    ep1, ep2 = endpoints[i], endpoints[j]
+    ep1, ep2, (hull_cx, hull_cy) = result
 
-    # 端点の中点（ローカル座標）
-    midpoint_local_x = (ep1[0] + ep2[0]) / 2
-    midpoint_local_y = (ep1[1] + ep2[1]) / 2
+    # 2. 端点の中点を計算（開口部の中心）
+    midpoint_x = (ep1[0] + ep2[0]) / 2
+    midpoint_y = (ep1[1] + ep2[1]) / 2
 
-    # グローバル座標に変換
-    midpoint_x = midpoint_local_x + x - padding
-    midpoint_y = midpoint_local_y + y - padding
-
-    # 6. 凸包の重心を計算
-    hull_points = cv2.convexHull(contour, returnPoints=True)
-    M_hull = cv2.moments(hull_points)
-    if M_hull["m00"] == 0:
-        return None
-    hull_cx = int(M_hull["m10"] / M_hull["m00"])
-    hull_cy = int(M_hull["m01"] / M_hull["m00"])
-
-    # 7. 方向ベクトル: 凸包重心 → 端点中点（開口部方向）
+    # 3. 方向ベクトル: 凸包重心 → 端点中点（開口部方向）
     dx = midpoint_x - hull_cx
     dy = midpoint_y - hull_cy
 
     norm = np.sqrt(dx**2 + dy**2)
     if norm < 1e-6:
-        return None
+        return fallback_orientation(contour)
 
     # 正規化
     dx_norm = dx / norm
     dy_norm = dy / norm
 
-    # 8. 始点を端点中点に設定し、そこから外側へ矢印を延ばす
+    # 4. 始点を端点中点に設定し、そこから外側へ矢印を延ばす
+    x, y, w, h = cv2.boundingRect(contour)
     cx = int(midpoint_x)
     cy = int(midpoint_y)
 
@@ -153,11 +173,11 @@ def calculate_horseshoe_orientation(contour):
     fx = int(cx + dx_norm * arrow_length)
     fy = int(cy + dy_norm * arrow_length)
 
-    # 9. 角度の計算
+    # 5. 角度の計算
     angle_rad_standard = np.arctan2(-dy, dx)
     angle_deg_standard = np.degrees(angle_rad_standard)
 
-    # 10. 座標系の変換: 要件 (下=0度、右=90度)
+    # 6. 座標系の変換: 要件 (下=0度、右=90度)
     orientation_angle = angle_deg_standard + 90
 
     # 角度を [-180, 180] の範囲に正規化
@@ -168,8 +188,9 @@ def calculate_horseshoe_orientation(contour):
 
     return orientation_angle, cx, cy, fx, fy
 
+
 def fallback_orientation(contour):
-    """端点検出に失敗した場合のフォールバック（元のアルゴリズム）"""
+    """輪郭検出に失敗した場合のフォールバック（重心ベース）"""
     M = cv2.moments(contour)
     if M["m00"] == 0:
         return None
