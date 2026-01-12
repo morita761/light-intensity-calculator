@@ -13,6 +13,9 @@ EXCLUSION_WIDTH = 50
 # 極座標ヒストグラムのビンの幅 (-0.5° ~ 0.5°にするため)
 BIN_NUM = 37
 
+# デバッグフラグ: True にすると骨格化・端点の詳細を表示
+DEBUG_SKELETON = True
+
 
 # アノテーションに使用する色のHSV範囲を定義 (変更なし)
 ANNOTATION_COLORS_HSV = {
@@ -53,9 +56,10 @@ def split_left_right(image):
 # ----------------------------------------------------
 # 【改善版】骨格化を使った凹の方向を計算する関数 (下=0度、右=90度、左=-90度)
 # ----------------------------------------------------
-def find_skeleton_endpoints(skeleton):
-    """骨格画像から端点を検出する"""
+def find_skeleton_endpoints_and_branches(skeleton):
+    """骨格画像から端点と分岐点を検出する"""
     endpoints = []
+    branch_points = []
     rows, cols = skeleton.shape
 
     for i in range(1, rows - 1):
@@ -65,18 +69,24 @@ def find_skeleton_endpoints(skeleton):
                 neighbors = skeleton[i-1:i+2, j-1:j+2].sum() - 1  # 自分自身を除く
                 if neighbors == 1:  # 端点は接続が1つだけ
                     endpoints.append((j, i))  # (x, y)形式
+                elif neighbors >= 3:  # 分岐点は接続が3つ以上
+                    branch_points.append((j, i))  # (x, y)形式
 
-    return endpoints
+    return endpoints, branch_points
 
-def calculate_horseshoe_orientation(contour):
+def calculate_horseshoe_orientation(contour, debug=False):
     """
     馬蹄形輪郭から凹（開口部）の方向を推定し、画像下=0度、右=90度、左=-90度の角度を返す。
 
     ロジック: U字形を骨格化（スケルトン化）して1本の曲線にし、
     その端点から開口部方向を推定する。
+
+    debug=Trueの場合、追加のデバッグ情報を返す。
     """
+    debug_info = None
+
     if len(contour) < 5:
-        return None
+        return None if not debug else (None, None)
 
     # 1. バウンディングボックスを取得
     x, y, w, h = cv2.boundingRect(contour)
@@ -94,12 +104,41 @@ def calculate_horseshoe_orientation(contour):
     # 3. 骨格化（スケルトン化）
     skeleton = skeletonize(mask > 0)
 
-    # 4. 骨格の端点を検出
-    endpoints = find_skeleton_endpoints(skeleton)
+    # 4. 骨格の端点と分岐点を検出
+    endpoints, branch_points = find_skeleton_endpoints_and_branches(skeleton)
+
+    # デバッグ情報を作成
+    if debug:
+        # 骨格画像をカラーに変換（可視化用）
+        skeleton_vis = np.zeros((mask_h, mask_w, 3), dtype=np.uint8)
+        skeleton_vis[skeleton] = (255, 255, 255)  # 骨格を白で表示
+
+        # 端点を緑で表示
+        for ep in endpoints:
+            cv2.circle(skeleton_vis, ep, 3, (0, 255, 0), -1)
+
+        # 分岐点を赤で表示
+        for bp in branch_points:
+            cv2.circle(skeleton_vis, bp, 3, (0, 0, 255), -1)
+
+        # マスク画像も保存
+        debug_info = {
+            'skeleton_vis': skeleton_vis,
+            'mask': mask,
+            'num_endpoints': len(endpoints),
+            'num_branch_points': len(branch_points),
+            'endpoints': endpoints,
+            'branch_points': branch_points
+        }
 
     if len(endpoints) < 2:
         # 端点が2つ未満の場合は元のアルゴリズムにフォールバック
-        return fallback_orientation(contour)
+        result = fallback_orientation(contour)
+        if debug:
+            if debug_info:
+                debug_info['fallback'] = True
+            return result, debug_info
+        return result
 
     # 5. 端点の中点を計算（U字の開口部の中心）
     # 端点が2つ以上ある場合、最も離れた2点を選ぶ
@@ -117,6 +156,11 @@ def calculate_horseshoe_orientation(contour):
                     max_dist = dist
                     ep1, ep2 = endpoints[i], endpoints[j]
 
+    # 選択された端点をデバッグ情報に追加
+    if debug and debug_info:
+        debug_info['selected_endpoints'] = (ep1, ep2)
+        debug_info['fallback'] = False
+
     # 端点の中点（ローカル座標）
     midpoint_local_x = (ep1[0] + ep2[0]) / 2
     midpoint_local_y = (ep1[1] + ep2[1]) / 2
@@ -129,7 +173,7 @@ def calculate_horseshoe_orientation(contour):
     hull_points = cv2.convexHull(contour, returnPoints=True)
     M_hull = cv2.moments(hull_points)
     if M_hull["m00"] == 0:
-        return None
+        return None if not debug else (None, debug_info)
     hull_cx = int(M_hull["m10"] / M_hull["m00"])
     hull_cy = int(M_hull["m01"] / M_hull["m00"])
 
@@ -139,7 +183,7 @@ def calculate_horseshoe_orientation(contour):
 
     norm = np.sqrt(dx**2 + dy**2)
     if norm < 1e-6:
-        return None
+        return None if not debug else (None, debug_info)
 
     # 正規化
     dx_norm = dx / norm
@@ -166,7 +210,11 @@ def calculate_horseshoe_orientation(contour):
     elif orientation_angle <= -180:
         orientation_angle += 360
 
-    return orientation_angle, cx, cy, fx, fy
+    result = (orientation_angle, cx, cy, fx, fy)
+
+    if debug:
+        return result, debug_info
+    return result
 
 def fallback_orientation(contour):
     """端点検出に失敗した場合のフォールバック（元のアルゴリズム）"""
@@ -294,11 +342,17 @@ for index, file_info in enumerate(image_pairs):
             else:
                 continue
 
-            orientation_result = calculate_horseshoe_orientation(contour)
+            # デバッグモードで関数を呼び出し
+            if DEBUG_SKELETON:
+                orientation_result, debug_info = calculate_horseshoe_orientation(contour, debug=True)
+            else:
+                orientation_result = calculate_horseshoe_orientation(contour, debug=False)
+                debug_info = None
+
             if orientation_result:
                 angle, cx, cy, fx, fy = orientation_result
                 current_angle_list.append(angle)
-                
+
                 # デバッグ表示: 重心(白)、開口部(緑)、方向ベクトル(シアン)
                 cv2.circle(debug_img, (cx, cy), 3, (255, 255, 255), -1)
                 cv2.circle(debug_img, (fx, fy), 3, (0, 255, 0), -1)
@@ -308,7 +362,30 @@ for index, file_info in enumerate(image_pairs):
                 dy = fy - cy
                 fx_ext = int(cx + dx * arrow_scale)
                 fy_ext = int(cy + dy * arrow_scale)
-                cv2.arrowedLine(debug_img, (cx, cy), (fx_ext, fy_ext), (255, 255, 0), 2, tipLength=0.2) 
+                cv2.arrowedLine(debug_img, (cx, cy), (fx_ext, fy_ext), (255, 255, 0), 2, tipLength=0.2)
+
+                # ----------------------------------------------------
+                # デバッグ: 骨格化と端点の表示
+                # ----------------------------------------------------
+                if DEBUG_SKELETON and debug_info:
+                    # 骨格画像を拡大表示
+                    skeleton_vis = debug_info['skeleton_vis']
+                    display_size = (150, 150)
+                    skeleton_resized = cv2.resize(skeleton_vis, display_size, interpolation=cv2.INTER_NEAREST)
+
+                    # 情報テキストを追加
+                    info_text = f"EP:{debug_info['num_endpoints']} BR:{debug_info['num_branch_points']}"
+                    fallback_text = "FB" if debug_info.get('fallback', False) else ""
+                    cv2.putText(skeleton_resized, info_text, (5, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
+                    if fallback_text:
+                        cv2.putText(skeleton_resized, fallback_text, (5, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
+
+                    # 馬蹄形ごとにウィンドウを表示
+                    window_name = f"Skeleton #{valid_horseshoe_count_left + valid_horseshoe_count_right} ({side_label}) Angle:{angle:.1f}"
+                    cv2.imshow(window_name, skeleton_resized)
+
+                    # コンソールにも情報を出力
+                    print(f"  [{side_label}] 端点数: {debug_info['num_endpoints']}, 分岐点数: {debug_info['num_branch_points']}, 角度: {angle:.1f}°, フォールバック: {debug_info.get('fallback', False)}") 
 
                 # ----------------------------------------------------
                 # ✨【新規追加】個々の馬蹄形のデバッグ表示
