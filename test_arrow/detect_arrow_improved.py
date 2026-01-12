@@ -621,45 +621,51 @@ else:
         plt.title(f'Annotated Image {i+1}')
         plt.axis('off')
 
-# 左側の極座標ヒストグラム
+# 左側の極座標ヒストグラム（正規化: probability）
 ax_left = plt.subplot(1, num_plots, 2, projection='polar')
 if left_horseshoe_angles:
     left_angles_rad = np.radians(left_horseshoe_angles)
-    angle_range = np.linspace(-np.pi, np.pi, BIN_NUM, endpoint=False) 
+    angle_range = np.linspace(-np.pi, np.pi, BIN_NUM, endpoint=False)
     counts, bin_edges = np.histogram(left_angles_rad, bins=angle_range)
     centers = (bin_edges[:-1] + bin_edges[1:]) / 2
     width = np.diff(bin_edges)
-    
-    bars = ax_left.bar(centers, counts, width=width, color='magenta', alpha=0.6, bottom=0)
-    
-    ax_left.set_theta_zero_location("S") 
-    ax_left.set_rlim(0, max(counts) * 1.1 if counts.size > 0 else 1)
-    
+
+    # 正規化: count → probability
+    prob = counts / counts.sum() if counts.sum() > 0 else counts
+
+    bars = ax_left.bar(centers, prob, width=width, color='magenta', alpha=0.6, bottom=0)
+
+    ax_left.set_theta_zero_location("S")
+    ax_left.set_rlim(0, 1)  # 確率なので0-1固定
+
     ax_left.set_xticks(np.radians([0, 90, 180, 270]))
     ax_left.set_xticklabels(['0°', '90°', '180°', ' -90°'])
-    ax_left .set_rlabel_position(135)
-    ax_left.set_title('Orientation Polar Histogram (Ventral)', va='bottom')
+    ax_left.set_rlabel_position(135)
+    ax_left.set_title(f'Ventral (n={len(left_horseshoe_angles)})', va='bottom')
 else:
     ax_left.text(0, 0, 'No data', ha='center', va='center', transform=ax_left.transAxes)
 
-# 右側の極座標ヒストグラム
+# 右側の極座標ヒストグラム（正規化: probability）
 ax_right = plt.subplot(1, num_plots, 3, projection='polar')
 if right_horseshoe_angles:
     right_angles_rad = np.radians(right_horseshoe_angles)
-    angle_range = np.linspace(-np.pi, np.pi, BIN_NUM, endpoint=False) 
+    angle_range = np.linspace(-np.pi, np.pi, BIN_NUM, endpoint=False)
     counts, bin_edges = np.histogram(right_angles_rad, bins=angle_range)
     centers = (bin_edges[:-1] + bin_edges[1:]) / 2
     width = np.diff(bin_edges)
 
-    bars = ax_right.bar(centers, counts, width=width, color='blue', alpha=0.6, bottom=0)
-    
+    # 正規化: count → probability
+    prob = counts / counts.sum() if counts.sum() > 0 else counts
+
+    bars = ax_right.bar(centers, prob, width=width, color='blue', alpha=0.6, bottom=0)
+
     ax_right.set_theta_zero_location("S")
-    ax_right.set_rlim(0, max(counts) * 1.1 if counts.size > 0 else 1)
-    
+    ax_right.set_rlim(0, 1)  # 確率なので0-1固定
+
     ax_right.set_xticks(np.radians([0, 90, 180, 270]))
     ax_right.set_xticklabels(['0°', '90°', '180°', ' -90°'])
     ax_right.set_rlabel_position(135)
-    ax_right.set_title('Orientation Polar Histogram (Dorsal)', va='bottom')
+    ax_right.set_title(f'Dorsal (n={len(right_horseshoe_angles)})', va='bottom')
 else:
     ax_right.text(0, 0, 'No data', ha='center', va='center', transform=ax_right.transAxes)
 
