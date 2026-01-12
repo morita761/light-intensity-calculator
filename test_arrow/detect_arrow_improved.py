@@ -74,6 +74,58 @@ def find_skeleton_endpoints_and_branches(skeleton):
 
     return endpoints, branch_points
 
+
+def bfs_distance(skeleton, start, end):
+    """
+    骨格上でstartからendまでのBFS最短経路長を計算する。
+    到達不可能な場合は-1を返す。
+    """
+    from collections import deque
+
+    rows, cols = skeleton.shape
+    visited = np.zeros_like(skeleton, dtype=bool)
+    queue = deque([(start[0], start[1], 0)])  # (x, y, distance)
+    visited[start[1], start[0]] = True
+
+    # 8近傍の方向
+    directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+
+    while queue:
+        x, y, dist = queue.popleft()
+
+        if (x, y) == end:
+            return dist
+
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < cols and 0 <= ny < rows:
+                if skeleton[ny, nx] and not visited[ny, nx]:
+                    visited[ny, nx] = True
+                    queue.append((nx, ny, dist + 1))
+
+    return -1  # 到達不可能
+
+
+def find_longest_path_endpoints(skeleton, endpoints):
+    """
+    骨格グラフ上で最長パスを持つ端点ペアを見つける。
+    端点が3個以上ある場合に使用する。
+    """
+    if len(endpoints) < 2:
+        return None
+
+    max_dist = -1
+    best_pair = (endpoints[0], endpoints[1])
+
+    for i in range(len(endpoints)):
+        for j in range(i + 1, len(endpoints)):
+            dist = bfs_distance(skeleton, endpoints[i], endpoints[j])
+            if dist > max_dist:
+                max_dist = dist
+                best_pair = (endpoints[i], endpoints[j])
+
+    return best_pair, max_dist
+
 def calculate_horseshoe_orientation(contour, debug=False):
     """
     馬蹄形輪郭から凹（開口部）の方向を推定し、画像下=0度、右=90度、左=-90度の角度を返す。
@@ -141,24 +193,37 @@ def calculate_horseshoe_orientation(contour, debug=False):
         return result
 
     # 5. 端点の中点を計算（U字の開口部の中心）
-    # 端点が2つ以上ある場合、最も離れた2点を選ぶ
-    if len(endpoints) == 2:
+    # 端点が2つで分岐点がない場合はそのまま使用
+    # 端点が3つ以上または分岐点がある場合は最長パスで補正
+    use_longest_path = len(endpoints) != 2 or len(branch_points) > 0
+
+    if not use_longest_path:
+        # 正常ケース: 端点が2つで分岐なし
         ep1, ep2 = endpoints[0], endpoints[1]
+        selection_method = "direct"
     else:
-        # 最も離れた2点を見つける
-        max_dist = 0
-        ep1, ep2 = endpoints[0], endpoints[1]
-        for i in range(len(endpoints)):
-            for j in range(i + 1, len(endpoints)):
-                dist = np.sqrt((endpoints[i][0] - endpoints[j][0])**2 +
-                               (endpoints[i][1] - endpoints[j][1])**2)
-                if dist > max_dist:
-                    max_dist = dist
-                    ep1, ep2 = endpoints[i], endpoints[j]
+        # 補正ケース: 最長パス（geodesic distance）を使用
+        result = find_longest_path_endpoints(skeleton, endpoints)
+        if result:
+            (ep1, ep2), path_dist = result
+            selection_method = f"longest_path(dist={path_dist})"
+        else:
+            # フォールバック: ユークリッド距離で最も離れた2点
+            max_dist = 0
+            ep1, ep2 = endpoints[0], endpoints[1]
+            for i in range(len(endpoints)):
+                for j in range(i + 1, len(endpoints)):
+                    dist = np.sqrt((endpoints[i][0] - endpoints[j][0])**2 +
+                                   (endpoints[i][1] - endpoints[j][1])**2)
+                    if dist > max_dist:
+                        max_dist = dist
+                        ep1, ep2 = endpoints[i], endpoints[j]
+            selection_method = "euclidean_fallback"
 
     # 選択された端点をデバッグ情報に追加
     if debug and debug_info:
         debug_info['selected_endpoints'] = (ep1, ep2)
+        debug_info['selection_method'] = selection_method
         debug_info['fallback'] = False
 
     # 端点の中点（ローカル座標）
@@ -369,23 +434,30 @@ for index, file_info in enumerate(image_pairs):
                 # ----------------------------------------------------
                 if DEBUG_SKELETON and debug_info:
                     # 骨格画像を拡大表示
-                    skeleton_vis = debug_info['skeleton_vis']
+                    skeleton_vis = debug_info['skeleton_vis'].copy()
+
+                    # 選択された端点をシアンでハイライト
+                    if 'selected_endpoints' in debug_info:
+                        sel_ep1, sel_ep2 = debug_info['selected_endpoints']
+                        cv2.circle(skeleton_vis, sel_ep1, 5, (255, 255, 0), 2)  # シアン枠
+                        cv2.circle(skeleton_vis, sel_ep2, 5, (255, 255, 0), 2)  # シアン枠
+
                     display_size = (150, 150)
                     skeleton_resized = cv2.resize(skeleton_vis, display_size, interpolation=cv2.INTER_NEAREST)
 
                     # 情報テキストを追加
                     info_text = f"EP:{debug_info['num_endpoints']} BR:{debug_info['num_branch_points']}"
-                    fallback_text = "FB" if debug_info.get('fallback', False) else ""
+                    method = debug_info.get('selection_method', '')
+                    method_short = "LP" if "longest_path" in method else ("D" if method == "direct" else "FB")
                     cv2.putText(skeleton_resized, info_text, (5, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
-                    if fallback_text:
-                        cv2.putText(skeleton_resized, fallback_text, (5, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
+                    cv2.putText(skeleton_resized, method_short, (5, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 255), 1)
 
                     # 馬蹄形ごとにウィンドウを表示
                     window_name = f"Skeleton #{valid_horseshoe_count_left + valid_horseshoe_count_right} ({side_label}) Angle:{angle:.1f}"
                     cv2.imshow(window_name, skeleton_resized)
 
                     # コンソールにも情報を出力
-                    print(f"  [{side_label}] 端点数: {debug_info['num_endpoints']}, 分岐点数: {debug_info['num_branch_points']}, 角度: {angle:.1f}°, フォールバック: {debug_info.get('fallback', False)}") 
+                    print(f"  [{side_label}] EP:{debug_info['num_endpoints']} BR:{debug_info['num_branch_points']} 方法:{debug_info.get('selection_method', 'N/A')} 角度:{angle:.1f}°") 
 
                 # ----------------------------------------------------
                 # ✨【新規追加】個々の馬蹄形のデバッグ表示
