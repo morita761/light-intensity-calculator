@@ -7,52 +7,88 @@ from statsmodels.formula.api import ols
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
 import numpy as np
 
-# ANOVA結果を表として図に描画する関数
-def plot_anova_table(anova_result, title, filename=None):
-    """ANOVA結果をテーブル形式で図として表示（日本語、必要項目のみ）"""
-    # データを整形
-    df = anova_result.copy()
-    df = df.reset_index()
-    df.columns = ['要因', '平方和', 'df', 'F', 'P値']
+# 日本語フォント設定
+import matplotlib
+matplotlib.rcParams['font.family'] = ['DejaVu Sans', 'IPAGothic', 'Noto Sans CJK JP', 'Hiragino Sans', 'Yu Gothic', 'Meiryo', 'sans-serif']
+# japanize-matplotlibがインストールされている場合は使用
+try:
+    import japanize_matplotlib
+except ImportError:
+    pass
 
-    # 日本語ラベルに変更
-    label_map = {
-        'C(genotype)': '系統 (Genotype)',
-        'C(branch)': '部位 (Left/Right)',
-        'C(genotype):C(branch)': '交互作用 (系統×部位)',
-        'Residual': '残差'
-    }
-    df['要因'] = df['要因'].map(lambda x: label_map.get(x, x))
+# P値を科学的表記でフォーマットする関数
+def format_p_value_scientific(p):
+    """P値を科学的表記でフォーマット（例: 6.27×10⁻⁸）"""
+    if pd.isna(p):
+        return '-'
 
-    # 残差行を除外（主効果と交互作用のみ表示）
-    df = df[df['要因'] != '残差']
+    # 有意性マーカーを決定
+    if p < 0.0001:
+        sig = '****'
+    elif p < 0.001:
+        sig = '***'
+    elif p < 0.01:
+        sig = '**'
+    elif p < 0.05:
+        sig = '*'
+    else:
+        sig = 'n.s.'
 
-    # 必要な列のみ選択（df, F, P値）
-    df_display = df[['要因', 'df', 'F', 'P値']].copy()
+    # P値のフォーマット
+    if p < 0.0001:
+        # 科学的表記: 6.27×10⁻⁸ の形式
+        exponent = int(np.floor(np.log10(p)))
+        mantissa = p / (10 ** exponent)
+        # 上付き数字に変換
+        superscript_map = str.maketrans('0123456789-', '⁰¹²³⁴⁵⁶⁷⁸⁹⁻')
+        exp_str = str(exponent).translate(superscript_map)
+        return f'{mantissa:.2f}×10{exp_str} {sig}'
+    else:
+        return f'{p:.4f} {sig}'
+
+# 2つのANOVA結果を1つの表にまとめて描画する関数
+def plot_combined_anova_table(anova_v, anova_d, title, filename=None):
+    """VentralとDorsalのANOVA結果を1つの表にまとめて表示"""
+
+    def process_anova(anova_result, target_label):
+        df = anova_result.copy()
+        df = df.reset_index()
+        df.columns = ['要因', '平方和', 'df', 'F', 'P値']
+
+        # 日本語ラベルに変更
+        label_map = {
+            'C(genotype)': '系統 (Genotype)',
+            'C(branch)': '部位 (Left/Right)',
+            'C(genotype):C(branch)': '交互作用 (系統×部位)',
+            'Residual': '残差'
+        }
+        df['要因'] = df['要因'].map(lambda x: label_map.get(x, x))
+
+        # 残差行を除外
+        df = df[df['要因'] != '残差']
+
+        # 解析対象列を追加
+        df['解析対象'] = target_label
+
+        return df
+
+    # VentralとDorsalのデータを処理
+    df_v = process_anova(anova_v, 'Ventral')
+    df_d = process_anova(anova_d, 'Dorsal')
+
+    # 結合
+    df_combined = pd.concat([df_v, df_d], ignore_index=True)
+
+    # 表示用に整形
+    df_display = df_combined[['解析対象', '要因', 'df', 'F', 'P値']].copy()
 
     # 数値をフォーマット
     df_display['df'] = df_display['df'].apply(lambda x: f'{int(x)}')
     df_display['F'] = df_display['F'].apply(lambda x: f'{x:.2f}' if pd.notna(x) else '-')
-
-    # P値のフォーマットと有意性マーカー
-    def format_p_value(p):
-        if pd.isna(p):
-            return '-'
-        if p < 0.0001:
-            return '< 0.0001 ****'
-        elif p < 0.001:
-            return f'{p:.4f} ***'
-        elif p < 0.01:
-            return f'{p:.4f} **'
-        elif p < 0.05:
-            return f'{p:.4f} *'
-        else:
-            return f'{p:.4f} n.s.'
-
-    df_display['P値'] = df['P値'].apply(format_p_value)
+    df_display['P値'] = df_combined['P値'].apply(format_p_value_scientific)
 
     # 図を作成
-    fig, ax = plt.subplots(figsize=(9, 2.5))
+    fig, ax = plt.subplots(figsize=(12, 4))
     ax.axis('tight')
     ax.axis('off')
 
@@ -73,6 +109,15 @@ def plot_anova_table(anova_result, title, filename=None):
     # ヘッダーの文字色を白に
     for i in range(len(df_display.columns)):
         table[(0, i)].set_text_props(color='white', fontweight='bold')
+
+    # Ventral/Dorsalで背景色を分ける
+    for i in range(len(df_display)):
+        if df_display.iloc[i]['解析対象'] == 'Ventral':
+            for j in range(len(df_display.columns)):
+                table[(i+1, j)].set_facecolor('#E6F3FF')
+        else:
+            for j in range(len(df_display.columns)):
+                table[(i+1, j)].set_facecolor('#FFF2E6')
 
     ax.set_title(title, fontsize=14, fontweight='bold', pad=20)
 
@@ -185,9 +230,8 @@ print("- C(branch): 部位間（Left vs Right）の主効果")
 print("- C(genotype):C(branch): 交互作用（系統によって左右差が異なるか）")
 print("=" * 60)
 
-# 4. ANOVA結果を図として保存
-plot_anova_table(anova_v, 'Two-way ANOVA: Ventral Side', 'anova_table_ventral.png')
-plot_anova_table(anova_d, 'Two-way ANOVA: Dorsal Side', 'anova_table_dorsal.png')
+# 4. ANOVA結果を図として保存（VentralとDorsalを1つの表に統合）
+plot_combined_anova_table(anova_v, anova_d, 'Two-way ANOVA Results', 'anova_table_combined.png')
 
 # 5. 事後検定 (Tukey HSD) - 系統間の多重比較
 print("\n" + "=" * 60)
