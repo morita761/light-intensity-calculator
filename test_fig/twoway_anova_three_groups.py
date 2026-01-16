@@ -125,40 +125,80 @@ def plot_combined_anova_table(anova_v, anova_d, title, filename=None):
 
     return fig
 
-def plot_tukey_table(tukey_result, title, filename=None):
-    """Tukey HSD結果をテーブル形式で図として表示"""
-    # Tukey結果をDataFrameに変換
-    df = pd.DataFrame(data=tukey_result._results_table.data[1:],
-                      columns=tukey_result._results_table.data[0])
+# 2つのTukey HSD結果を1つの表にまとめて描画する関数
+def plot_combined_tukey_table(tukey_v, tukey_d, title, filename=None):
+    """VentralとDorsalのTukey HSD結果を1つの表にまとめて表示（日本語）"""
 
-    # 数値をフォーマット
-    df['meandiff'] = df['meandiff'].apply(lambda x: f'{float(x):.3f}')
-    df['p-adj'] = df['p-adj'].apply(lambda x: f'{float(x):.4f}')
-    df['lower'] = df['lower'].apply(lambda x: f'{float(x):.3f}')
-    df['upper'] = df['upper'].apply(lambda x: f'{float(x):.3f}')
+    def process_tukey(tukey_result, target_label):
+        df = pd.DataFrame(data=tukey_result._results_table.data[1:],
+                          columns=tukey_result._results_table.data[0])
+        df['解析対象'] = target_label
+        return df
+
+    # VentralとDorsalのデータを処理
+    df_v = process_tukey(tukey_v, 'Ventral')
+    df_d = process_tukey(tukey_d, 'Dorsal')
+
+    # 結合
+    df_combined = pd.concat([df_v, df_d], ignore_index=True)
+
+    # P値のフォーマット（有意性マーカー付き）
+    def format_tukey_p(p):
+        p_val = float(p)
+        if p_val < 0.0001:
+            sig = '****'
+            exponent = int(np.floor(np.log10(p_val)))
+            mantissa = p_val / (10 ** exponent)
+            return f'{mantissa:.2f}e{exponent} {sig}'
+        elif p_val < 0.001:
+            return f'{p_val:.4f} ***'
+        elif p_val < 0.01:
+            return f'{p_val:.4f} **'
+        elif p_val < 0.05:
+            return f'{p_val:.4f} *'
+        else:
+            return f'{p_val:.4f} n.s.'
+
+    # 表示用に整形
+    df_display = pd.DataFrame()
+    df_display['解析対象'] = df_combined['解析対象']
+    df_display['比較1'] = df_combined['group1']
+    df_display['比較2'] = df_combined['group2']
+    df_display['平均差'] = df_combined['meandiff'].apply(lambda x: f'{float(x):.3f}')
+    df_display['調整済P値'] = df_combined['p-adj'].apply(format_tukey_p)
+    df_display['有意'] = df_combined['reject'].apply(lambda x: 'Yes' if x else 'No')
 
     # 図を作成
-    fig, ax = plt.subplots(figsize=(10, 2.5))
+    fig, ax = plt.subplots(figsize=(14, 4.5))
     ax.axis('tight')
     ax.axis('off')
 
     # テーブルを作成
     table = ax.table(
-        cellText=df.values,
-        colLabels=df.columns,
+        cellText=df_display.values,
+        colLabels=df_display.columns,
         cellLoc='center',
         loc='center',
-        colColours=['#70AD47'] * len(df.columns)
+        colColours=['#70AD47'] * len(df_display.columns)
     )
 
     # スタイル調整
     table.auto_set_font_size(False)
     table.set_fontsize(10)
-    table.scale(1.2, 1.5)
+    table.scale(1.2, 1.6)
 
     # ヘッダーの文字色を白に
-    for i in range(len(df.columns)):
+    for i in range(len(df_display.columns)):
         table[(0, i)].set_text_props(color='white', fontweight='bold')
+
+    # Ventral/Dorsalで背景色を分ける
+    for i in range(len(df_display)):
+        if df_display.iloc[i]['解析対象'] == 'Ventral':
+            for j in range(len(df_display.columns)):
+                table[(i+1, j)].set_facecolor('#E6FFE6')
+        else:
+            for j in range(len(df_display.columns)):
+                table[(i+1, j)].set_facecolor('#FFFFE6')
 
     ax.set_title(title, fontsize=14, fontweight='bold', pad=20)
 
@@ -245,9 +285,8 @@ print("\n[Dorsal Side - Genotype Comparison]")
 tukey_d = pairwise_tukeyhsd(data_d['intensity'], data_d['genotype'], alpha=0.05)
 print(tukey_d)
 
-# Tukey HSD結果を図として保存
-plot_tukey_table(tukey_v, 'Tukey HSD: Ventral Side', 'tukey_table_ventral.png')
-plot_tukey_table(tukey_d, 'Tukey HSD: Dorsal Side', 'tukey_table_dorsal.png')
+# Tukey HSD結果を図として保存（VentralとDorsalを1つの表に統合）
+plot_combined_tukey_table(tukey_v, tukey_d, 'Tukey HSD 多重比較結果', 'tukey_table_combined.png')
 
 # 7. 相互作用プロット (Interaction Plot) の作成
 fig, axes = plt.subplots(1, 2, figsize=(14, 5))
