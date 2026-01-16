@@ -23,6 +23,17 @@ diff_all = pd.concat([
     get_diff_df(cas9_d, 'Cas9', 'Dorsal')
 ])
 
+# 3. 統計計算とアスタリスクの判定
+c_data = diff_all[diff_all['genotype'] == 'Control']['abs_diff']
+k_data = diff_all[diff_all['genotype'] == 'Cas9']['abs_diff']
+_, p_val = stats.ttest_ind(c_data, k_data)
+
+if p_val < 0.0001: asterisks = "****"
+elif p_val < 0.001: asterisks = "***"
+elif p_val < 0.01: asterisks = "**"
+elif p_val < 0.05: asterisks = "*"
+else: asterisks = "n.s."
+
 # 3. split=True を用いたバイオリンプロットの作成
 plt.figure(figsize=(10, 7))
 
@@ -41,15 +52,20 @@ for i, line in enumerate(ax.lines):
 # 個別のドットを追加 (dodge=Trueにすることで左右に分かれたバイオリンに合わせる)
 sns.stripplot(data=diff_all, x='genotype', y='abs_diff', hue='side',
               dodge=True, color='black', alpha=0.2, jitter=True, size=2, legend=False)
-# 統計数値の計算
-t_stat, p_val = stats.ttest_ind(
-    diff_all[diff_all['genotype']=='Control']['abs_diff'],
-    diff_all[diff_all['genotype']=='Cas9']['abs_diff']
-)
+
+# 5. 線とアスタリスクの描画 (動的な位置決定)
+max_val = diff_all['abs_diff'].max()
+line_y = max_val + 10
+star_y = line_y + 0.5
+
+# ブラケット横線 (x=0 と x=1)
+ax.plot([0, 0, 1, 1], [line_y, line_y + 1, line_y + 1, line_y], lw=1.5, c='black')
+# アスタリスクテキスト
+ax.text(0.5, star_y, asterisks, ha='center', va='bottom', fontsize=18)
 
 plt.title(f'Polarity Magnitude (|L - R|) Comparison\nSplit Violin Plot (Ventral vs Dorsal)(P = {p_val:.2e})')
 plt.ylabel('Absolute Intensity Difference')
 plt.xlabel('Genotype')
-
+plt.ylim(0, star_y + 5) # 上部に余白を作る
 plt.tight_layout()
 plt.show()
