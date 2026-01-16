@@ -1,12 +1,24 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy import stats
 
 # 1. データの読み込み (スペース区切り)
 control_v = pd.read_csv('control_v.csv', sep=' ')
 control_d = pd.read_csv('control_d.csv', sep=' ')
 cas9_v = pd.read_csv('cas9_v.csv', sep=' ')
 cas9_d = pd.read_csv('cas9_d.csv', sep=' ')
+
+# 1. 各サンプルごとの絶対値の差を計算 (|Left - Right|)
+control_v_diff = (control_v['left_intensity'] - control_v['right_intensity']).abs()
+cas9_v_diff = (cas9_v['left_intensity'] - cas9_v['right_intensity']).abs()
+
+# 2. t検定を実行
+t_stat, p_val = stats.ttest_ind(control_v_diff, cas9_v_diff)
+
+print(f"Ventral Side - Control Mean Diff: {control_v_diff.mean():.2f}")
+print(f"Ventral Side - Cas9 Mean Diff: {cas9_v_diff.mean():.2f}")
+print(f"P-value: {p_val:.6f}")
 
 # 2. データの整形用関数
 def prepare_data(df_ctrl, df_cas9, side_label):
