@@ -320,14 +320,14 @@ def plot_single_genotype(debug_images, left_heatmap, right_heatmap, genotype_nam
         ax_left = fig.add_subplot(gs_outer[0, 1])
         im_left = ax_left.imshow(left_heatmap, cmap='viridis', vmin=0, vmax=255)
         plt.colorbar(im_left, ax=ax_left, label='Normalized Average GFP Intensity')
-        ax_left.set_title(f'{genotype_name}\nAverage GFP Intensity Heatmap (Ventral)')
+        ax_left.set_title(f'{genotype_name}\nAverage GFP Intensity Heatmap \n(Ventral)')
         ax_left.axis('off')
 
         # 右側のヒートマップのプロット
         ax_right = fig.add_subplot(gs_outer[0, 2])
         im_right = ax_right.imshow(right_heatmap, cmap='viridis', vmin=0, vmax=255)
         plt.colorbar(im_right, ax=ax_right, label='Normalized Average GFP Intensity')
-        ax_right.set_title(f'{genotype_name}\nAverage GFP Intensity Heatmap (Dorsal)')
+        ax_right.set_title(f'{genotype_name}\nAverage GFP Intensity Heatmap \n(Dorsal)')
         ax_right.axis('off')
     else:
         # Debug画像が4枚未満の場合
@@ -342,14 +342,14 @@ def plot_single_genotype(debug_images, left_heatmap, right_heatmap, genotype_nam
         plt.subplot(1, num_plots, 2)
         plt.imshow(left_heatmap, cmap='viridis', vmin=0, vmax=255)
         plt.colorbar(label='Normalized Average GFP Intensity')
-        plt.title(f'{genotype_name}\nAverage GFP Intensity Heatmap (Ventral)')
+        plt.title(f'{genotype_name}\nAverage GFP Intensity Heatmap \n(Ventral)')
         plt.axis('off')
 
         # 右側のヒートマップのプロット
         plt.subplot(1, num_plots, 3)
         plt.imshow(right_heatmap, cmap='viridis', vmin=0, vmax=255)
         plt.colorbar(label='Normalized Average GFP Intensity')
-        plt.title(f'{genotype_name}\nAverage GFP Intensity Heatmap (Dorsal)')
+        plt.title(f'{genotype_name}\nAverage GFP Intensity Heatmap \n(Dorsal)')
         plt.axis('off')
 
     plt.tight_layout()
