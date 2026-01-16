@@ -18,7 +18,7 @@ except ImportError:
 
 # P値を科学的表記でフォーマットする関数
 def format_p_value_scientific(p):
-    """P値を科学的表記でフォーマット（例: 6.27×10⁻⁸）"""
+    """P値を科学的表記でフォーマット（例: 6.27e-8）"""
     if pd.isna(p):
         return '-'
 
@@ -36,13 +36,10 @@ def format_p_value_scientific(p):
 
     # P値のフォーマット
     if p < 0.0001:
-        # 科学的表記: 6.27×10⁻⁸ の形式
+        # 科学的表記: 6.27e-8 の形式（文字化けしない）
         exponent = int(np.floor(np.log10(p)))
         mantissa = p / (10 ** exponent)
-        # 上付き数字に変換
-        superscript_map = str.maketrans('0123456789-', '⁰¹²³⁴⁵⁶⁷⁸⁹⁻')
-        exp_str = str(exponent).translate(superscript_map)
-        return f'{mantissa:.2f}×10{exp_str} {sig}'
+        return f'{mantissa:.2f}e{exponent} {sig}'
     else:
         return f'{p:.4f} {sig}'
 
