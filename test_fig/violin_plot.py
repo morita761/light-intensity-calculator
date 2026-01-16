@@ -27,8 +27,16 @@ diff_all = pd.concat([
 plt.figure(figsize=(10, 7))
 
 # hue='side' と split=True を組み合わせる
-sns.violinplot(data=diff_all, x='genotype', y='abs_diff', hue='side',
+ax = sns.violinplot(data=diff_all, x='genotype', y='abs_diff', hue='side',
                split=True, inner='quartile', palette='Set2', alpha=0.7)
+
+# 2系統 × 2サイド(split) = 4つの半バイオリンがあり、各3本ずつ線がある
+for i, line in enumerate(ax.lines):
+    if i % 3 == 1: # 0,1,2の「1」が中央値
+        line.set_color('red')      # 赤色
+        line.set_linewidth(2.5)    # 太く
+        line.set_linestyle('-')    # 実線に変更
+        line.set_alpha(1.0)
 
 # 個別のドットを追加 (dodge=Trueにすることで左右に分かれたバイオリンに合わせる)
 sns.stripplot(data=diff_all, x='genotype', y='abs_diff', hue='side',
