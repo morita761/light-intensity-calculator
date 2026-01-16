@@ -145,6 +145,9 @@ def plot_combined_tukey_table(tukey_v, tukey_d, title, filename=None):
     # P値のフォーマット（有意性マーカー付き）
     def format_tukey_p(p):
         p_val = float(p)
+        # P値が0または非常に小さい場合の処理
+        if p_val <= 0 or np.isnan(p_val) or np.isinf(p_val):
+            return '< 1e-15 ****'
         if p_val < 0.0001:
             sig = '****'
             exponent = int(np.floor(np.log10(p_val)))
