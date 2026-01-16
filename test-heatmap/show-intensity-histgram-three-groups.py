@@ -61,25 +61,25 @@ image_pairs_control = [
 
 # vang RNAi用（画像準備後にパスを変更）
 image_pairs_vang_rnai = [
-    {'original': './pics/control/Projections of 241106_Fz_002_second.png',
-     'mask': './pics/control/Projections of 241106_Fz_002_second_mask.tif'},
-    {'original':'./pics/control/Projections of 241106_Fz_control003.png',
-     'mask': './pics/control/Projections of 241106_Fz_control003_mask.tif'},
-    {'original':'./pics/control/Projections of 20241024_controlFz001.png',
-     'mask': './pics/control/Projections of 20241024_controlFz001_mask.tif'},
-    {'original':'./pics/control/Projections of 20241024_controlFz003.png',
-     'mask': './pics/control/Projections of 20241024_controlFz003_mask.tif'}
+    {'original': './pics/vang-rnai/C1-Projections of 20240929_Fz_GFP_loco_Gal4_UAS_vang_RNAi003.png',
+     'mask': './pics/vang-rnai/C1-Projections of 20240929_Fz_GFP_loco_Gal4_UAS_vang_RNAi003_mask.tif'},
+    {'original':'./pics/vang-rnai/C1-Projections of 20241024_Fz_GFP.nd2-20241024_Fz_GFP-1.png',
+     'mask': './pics/vang-rnai/C1-Projections of 20241024_Fz_GFP.nd2-20241024_Fz_GFP-1_mask.tif'},
+    {'original':'./pics/vang-rnai/Projections of C1-20241024_Fz_GFP.nd2-20241024_Fz_GFP_3.png',
+     'mask': './pics/vang-rnai/Projections of C1-20241024_Fz_GFP.nd2-20241024_Fz_GFP_3_mask.tif'},
+    {'original':'./pics/vang-rnai/Projections of C1-20241024_Fz_GFP.nd2-20241024_Fz_GFP_4.png',
+     'mask': './pics/vang-rnai/Projections of C1-20241024_Fz_GFP.nd2-20241024_Fz_GFP_4_mask.tif'}
 ]
 
 image_pairs_vang_cas9 = [
-    {'original': './pics/vang/Projections of 20250404_24%APF_Fz-GFP_loco-vang-Cas9P_001_ue.png',
-     'mask': './pics/vang/Projections of 20250404_24%APF_Fz-GFP_loco-vang-Cas9P_001_ue_mask.tif'},
-    {'original':'./pics/vang/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_sita.png',
-     'mask': './pics/vang/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_sita_mask.tif'},
-    {'original':'./pics/vang/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_ue.png',
-     'mask': './pics/vang/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_ue_mask.tif'},
-    {'original':'./pics/vang/Projections of 20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P.nd2-20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P_2.png',
-     'mask': './pics/vang/Projections of 20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P.nd2-20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P_2_mask.tif'}
+    {'original': './pics/vang-cas9/Projections of 20250404_24%APF_Fz-GFP_loco-vang-Cas9P_001_ue.png',
+     'mask': './pics/vang-cas9/Projections of 20250404_24%APF_Fz-GFP_loco-vang-Cas9P_001_ue_mask.tif'},
+    {'original':'./pics/vang-cas9/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_sita.png',
+     'mask': './pics/vang-cas9/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_sita_mask.tif'},
+    {'original':'./pics/vang-cas9/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_ue.png',
+     'mask': './pics/vang-cas9/Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_ue_mask.tif'},
+    {'original':'./pics/vang-cas9/Projections of 20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P.nd2-20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P_2.png',
+     'mask': './pics/vang-cas9/Projections of 20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P.nd2-20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P_2_mask.tif'}
 ]
 
 # 全ての画像ペアを結合（グローバル平均輝度計算のため）
