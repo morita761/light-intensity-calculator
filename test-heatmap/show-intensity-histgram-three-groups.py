@@ -285,55 +285,87 @@ avg_vang_cas9_right_norm = normalize_average_heatmap(avg_vang_cas9_right, "vang 
 
 
 # =========================================================================
-# 【STEP 5】 3系統のヒートマップを表示
+# 【STEP 5】 各系統ごとに1枚の画像を出力
 # =========================================================================
 
-def plot_debug_images_grid(debug_images, title, ax):
-    """デバッグ画像を2x2グリッドで表示"""
-    num_images = min(len(debug_images), 4)
-    if num_images == 0:
-        ax.axis('off')
-        return
+def plot_single_genotype(debug_images, left_heatmap, right_heatmap, genotype_name, output_filename):
+    """1系統分のヒートマップを1枚の画像として出力"""
+    num_plots = 3
+    rows_inner = 2
+    cols_inner = 2
+    num_debug_images = len(debug_images)
 
-    rows, cols = 2, 2
-    for i in range(num_images):
-        row = i // cols
-        col = i % cols
-        # サブプロット内にさらにグリッドを作成
-        inner_ax = ax.inset_axes([col * 0.5, (1 - row) * 0.5 - 0.5, 0.5, 0.5])
-        inner_ax.imshow(cv2.cvtColor(debug_images[i], cv2.COLOR_BGR2RGB))
-        inner_ax.axis('off')
-    ax.set_title(title, fontsize=12)
-    ax.axis('off')
+    fig = plt.figure(figsize=(num_plots * 4, 4))
 
-# 3系統 x 3列（デバッグ画像、Left、Right）のグリッドを作成
-fig, axes = plt.subplots(3, 3, figsize=(15, 12))
+    if num_debug_images >= 4:
+        # 外側の GridSpec を定義 (図全体を1行 num_plots列に分割)
+        gs_outer = gridspec.GridSpec(1, num_plots, figure=fig)
 
-genotypes = ['Control', 'vang RNAi', 'vang Cas9']
-debug_images_list = [debug_images_control, debug_images_vang_rnai, debug_images_vang_cas9]
-left_heatmaps = [avg_control_left_norm, avg_vang_rnai_left_norm, avg_vang_cas9_left_norm]
-right_heatmaps = [avg_control_right_norm, avg_vang_rnai_right_norm, avg_vang_cas9_right_norm]
+        # 1区画目 (左端) の中に、内側の GridSpec (2行2列) をネストして定義
+        gs_inner = gridspec.GridSpecFromSubplotSpec(rows_inner, cols_inner,
+                                                    subplot_spec=gs_outer[0, 0],
+                                                    wspace=0.1, hspace=0.1)
 
-for row_idx, genotype in enumerate(genotypes):
-    # デバッグ画像（2x2グリッド）
-    plot_debug_images_grid(debug_images_list[row_idx], f'{genotype} - Annotated', axes[row_idx, 0])
+        # 2x2 の各セルにデバッグ画像をプロット
+        for i in range(num_debug_images):
+            if i >= 4:
+                break
+            if i < rows_inner * cols_inner:
+                ax = fig.add_subplot(gs_inner[i])
+                ax.imshow(cv2.cvtColor(debug_images[i], cv2.COLOR_BGR2RGB))
+                ax.set_title(f'Annotated {i+1}', fontsize=10)
+                ax.axis('off')
 
-    # Left (Ventral) ヒートマップ
-    im_left = axes[row_idx, 1].imshow(left_heatmaps[row_idx], cmap='viridis', vmin=0, vmax=255)
-    axes[row_idx, 1].set_title(f'{genotype} - Ventral (Left)')
-    axes[row_idx, 1].axis('off')
+        # 左側のヒートマップのプロット
+        ax_left = fig.add_subplot(gs_outer[0, 1])
+        im_left = ax_left.imshow(left_heatmap, cmap='viridis', vmin=0, vmax=255)
+        plt.colorbar(im_left, ax=ax_left, label='Normalized Average GFP Intensity')
+        ax_left.set_title(f'{genotype_name}\nAverage GFP Intensity Heatmap (Ventral)')
+        ax_left.axis('off')
 
-    # Right (Dorsal) ヒートマップ
-    im_right = axes[row_idx, 2].imshow(right_heatmaps[row_idx], cmap='viridis', vmin=0, vmax=255)
-    axes[row_idx, 2].set_title(f'{genotype} - Dorsal (Right)')
-    axes[row_idx, 2].axis('off')
+        # 右側のヒートマップのプロット
+        ax_right = fig.add_subplot(gs_outer[0, 2])
+        im_right = ax_right.imshow(right_heatmap, cmap='viridis', vmin=0, vmax=255)
+        plt.colorbar(im_right, ax=ax_right, label='Normalized Average GFP Intensity')
+        ax_right.set_title(f'{genotype_name}\nAverage GFP Intensity Heatmap (Dorsal)')
+        ax_right.axis('off')
+    else:
+        # Debug画像が4枚未満の場合
+        plot_index = 1
+        for i in range(num_debug_images):
+            plt.subplot(1, num_plots, 1)
+            plt.imshow(cv2.cvtColor(debug_images[i], cv2.COLOR_BGR2RGB))
+            plt.title(f'Annotated Image {i+1}')
+            plt.axis('off')
 
-# カラーバーを追加
-fig.colorbar(im_right, ax=axes[:, 2], shrink=0.6, label='Normalized GFP Intensity')
+        # 左側のヒートマップのプロット
+        plt.subplot(1, num_plots, 2)
+        plt.imshow(left_heatmap, cmap='viridis', vmin=0, vmax=255)
+        plt.colorbar(label='Normalized Average GFP Intensity')
+        plt.title(f'{genotype_name}\nAverage GFP Intensity Heatmap (Ventral)')
+        plt.axis('off')
 
-plt.tight_layout()
-plt.savefig('heatmap_three_groups.png', dpi=300, bbox_inches='tight')
-plt.show()
+        # 右側のヒートマップのプロット
+        plt.subplot(1, num_plots, 3)
+        plt.imshow(right_heatmap, cmap='viridis', vmin=0, vmax=255)
+        plt.colorbar(label='Normalized Average GFP Intensity')
+        plt.title(f'{genotype_name}\nAverage GFP Intensity Heatmap (Dorsal)')
+        plt.axis('off')
+
+    plt.tight_layout()
+    plt.savefig(output_filename, dpi=300, bbox_inches='tight')
+    plt.show()
+    print(f"{output_filename} を保存しました。")
+
+# 各系統ごとに画像を出力
+plot_single_genotype(debug_images_control, avg_control_left_norm, avg_control_right_norm,
+                     'Control', 'heatmap_control.png')
+
+plot_single_genotype(debug_images_vang_rnai, avg_vang_rnai_left_norm, avg_vang_rnai_right_norm,
+                     'vang RNAi', 'heatmap_vang_rnai.png')
+
+plot_single_genotype(debug_images_vang_cas9, avg_vang_cas9_left_norm, avg_vang_cas9_right_norm,
+                     'vang Cas9', 'heatmap_vang_cas9.png')
 
 
 # =========================================================================
