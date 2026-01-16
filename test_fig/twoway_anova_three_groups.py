@@ -209,6 +209,24 @@ plot_tukey_table(tukey_v, 'Tukey HSD: Ventral Side', 'tukey_table_ventral.png')
 plot_tukey_table(tukey_d, 'Tukey HSD: Dorsal Side', 'tukey_table_dorsal.png')
 
 # 7. 相互作用プロット (Interaction Plot) の作成
+
+# 交互作用のP値を取得
+p_interaction_v = anova_v.loc['C(genotype):C(branch)', 'PR(>F)']
+p_interaction_d = anova_d.loc['C(genotype):C(branch)', 'PR(>F)']
+
+def format_p_value(p):
+    """P値を表示用にフォーマット"""
+    if p < 0.0001:
+        return "P(interaction) < 0.0001"
+    elif p < 0.001:
+        return f"P(interaction) < 0.001"
+    elif p < 0.01:
+        return f"P(interaction) < 0.01"
+    elif p < 0.05:
+        return f"P(interaction) < 0.05"
+    else:
+        return f"P(interaction) = {p:.3f}"
+
 fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
 # Ventral Side Plot
@@ -218,6 +236,10 @@ axes[0].set_title('Interaction Plot: Ventral Side')
 axes[0].set_ylabel('GFP Intensity')
 axes[0].set_xlabel('Branch')
 axes[0].legend(title='Genotype')
+# 交互作用P値を表示
+axes[0].text(0.5, 0.95, format_p_value(p_interaction_v),
+             transform=axes[0].transAxes, fontsize=14, fontweight='bold',
+             ha='center', va='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
 
 # Dorsal Side Plot
 sns.pointplot(data=data_d, x='branch', y='intensity', hue='genotype',
@@ -226,6 +248,10 @@ axes[1].set_title('Interaction Plot: Dorsal Side')
 axes[1].set_ylabel('GFP Intensity')
 axes[1].set_xlabel('Branch')
 axes[1].legend(title='Genotype')
+# 交互作用P値を表示
+axes[1].text(0.5, 0.95, format_p_value(p_interaction_d),
+             transform=axes[1].transAxes, fontsize=14, fontweight='bold',
+             ha='center', va='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
 
 plt.tight_layout()
 plt.savefig('interaction_plots_three_groups.png', dpi=300, bbox_inches='tight')
