@@ -94,7 +94,7 @@ def plot_combined_anova_table(anova_v, anova_d, title, filename=None):
         cellText=df_display.values,
         colLabels=df_display.columns,
         cellLoc='center',
-        loc='center',
+        loc='upper center',
         colColours=['#4472C4'] * len(df_display.columns)
     )
 
@@ -181,7 +181,7 @@ def plot_combined_tukey_table(tukey_v, tukey_d, title, filename=None):
         cellText=df_display.values,
         colLabels=df_display.columns,
         cellLoc='center',
-        loc='center',
+        loc='upper center',
         colColours=['#70AD47'] * len(df_display.columns)
     )
 
