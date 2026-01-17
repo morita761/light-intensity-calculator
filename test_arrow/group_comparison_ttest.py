@@ -436,7 +436,7 @@ def print_ttest_results(ventral_result, dorsal_result):
         print(f"  Control: n={result['control_n']}, "
               f"mean={result['control_mean']:.2f}°, "
               f"std={result['control_std']:.2f}°")
-        print(f"  Test:    n={result['test_n']}, "
+        print(f"  vang Cas9:    n={result['test_n']}, "
               f"mean={result['test_mean']:.2f}°, "
               f"std={result['test_std']:.2f}°")
         print(f"  t-statistic = {result['t_statistic']:.4f}")
@@ -475,7 +475,7 @@ def plot_results(control_data, test_data, ventral_result, dorsal_result):
     # =================================
     ax1 = axes[0, 0]
     data_ventral = [control_data['ventral'], test_data['ventral']]
-    bp1 = ax1.boxplot(data_ventral, labels=['Control', 'Test'], patch_artist=True)
+    bp1 = ax1.boxplot(data_ventral, labels=['Control', 'vang Cas9'], patch_artist=True)
     bp1['boxes'][0].set_facecolor('lightblue')
     bp1['boxes'][1].set_facecolor('lightcoral')
 
@@ -483,14 +483,14 @@ def plot_results(control_data, test_data, ventral_result, dorsal_result):
     ax1.set_title(f"Ventral Side\n"
                   f"Control: n={ventral_result['control_n']}, "
                   f"mean={ventral_result['control_mean']:.1f}° ± {ventral_result['control_std']:.1f}°\n"
-                  f"Test: n={ventral_result['test_n']}, "
+                  f"vang Cas9: n={ventral_result['test_n']}, "
                   f"mean={ventral_result['test_mean']:.1f}° ± {ventral_result['test_std']:.1f}°")
     ax1.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
     ax1.set_ylim(-180, 220)
 
     # 線とアスタリスクの描画 (Ventral)
     asterisks_ventral = get_asterisks(ventral_result['p_value'])
-    line_y1 = 185
+    line_y1 = 120
     star_y1 = line_y1 + 3
     ax1.plot([1, 1, 2, 2], [line_y1, line_y1 + 5, line_y1 + 5, line_y1], lw=1.5, c='black')
     ax1.text(1.5, star_y1, asterisks_ventral, ha='center', va='bottom', fontsize=14)
@@ -500,7 +500,7 @@ def plot_results(control_data, test_data, ventral_result, dorsal_result):
     # =================================
     ax2 = axes[0, 1]
     data_dorsal = [control_data['dorsal'], test_data['dorsal']]
-    bp2 = ax2.boxplot(data_dorsal, labels=['Control', 'Test'], patch_artist=True)
+    bp2 = ax2.boxplot(data_dorsal, labels=['Control', 'vang Cas9'], patch_artist=True)
     bp2['boxes'][0].set_facecolor('lightblue')
     bp2['boxes'][1].set_facecolor('lightcoral')
 
@@ -508,14 +508,14 @@ def plot_results(control_data, test_data, ventral_result, dorsal_result):
     ax2.set_title(f"Dorsal Side\n"
                   f"Control: n={dorsal_result['control_n']}, "
                   f"mean={dorsal_result['control_mean']:.1f}° ± {dorsal_result['control_std']:.1f}°\n"
-                  f"Test: n={dorsal_result['test_n']}, "
+                  f"vang Cas9: n={dorsal_result['test_n']}, "
                   f"mean={dorsal_result['test_mean']:.1f}° ± {dorsal_result['test_std']:.1f}°")
     ax2.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
     ax2.set_ylim(-180, 220)
 
     # 線とアスタリスクの描画 (Dorsal)
     asterisks_dorsal = get_asterisks(dorsal_result['p_value'])
-    line_y2 = 185
+    line_y2 = 120
     star_y2 = line_y2 + 3
     ax2.plot([1, 1, 2, 2], [line_y2, line_y2 + 5, line_y2 + 5, line_y2], lw=1.5, c='black')
     ax2.text(1.5, star_y2, asterisks_dorsal, ha='center', va='bottom', fontsize=14)
@@ -538,14 +538,15 @@ def plot_results(control_data, test_data, ventral_result, dorsal_result):
     if test_data['ventral']:
         test_rad = np.radians(test_data['ventral'])
         counts_test, _ = np.histogram(test_rad, bins=bin_edges)
-        prob_test = counts_test / counts_test.sum() if counts_test.sum() > 0 else counts_test
+        prob_test_l = counts_test / counts_test.sum() if counts_test.sum() > 0 else counts_test
         centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         width = np.diff(bin_edges)
-        ax3.bar(centers, prob_test, width=width, color='red', alpha=0.5, label='Test')
+        ax3.bar(centers, prob_test_l, width=width, color='red', alpha=0.5, label='vang Cas9')
 
     ax3.set_theta_zero_location("S")
     ax3.set_xticks(np.radians([0, 90, 180, 270]))
     ax3.set_xticklabels(['0°', '90°', '180°', '-90°'])
+    ax3.set_rlabel_position(135)
     ax3.set_title('Ventral - Polar Histogram', va='bottom', pad=20)
     ax3.legend(loc='upper right', bbox_to_anchor=(1.3, 1.0))
 
@@ -565,16 +566,24 @@ def plot_results(control_data, test_data, ventral_result, dorsal_result):
     if test_data['dorsal']:
         test_rad = np.radians(test_data['dorsal'])
         counts_test, _ = np.histogram(test_rad, bins=bin_edges)
-        prob_test = counts_test / counts_test.sum() if counts_test.sum() > 0 else counts_test
+        prob_test_r = counts_test / counts_test.sum() if counts_test.sum() > 0 else counts_test
         centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         width = np.diff(bin_edges)
-        ax4.bar(centers, prob_test, width=width, color='red', alpha=0.5, label='Test')
+        ax4.bar(centers, prob_test_r, width=width, color='red', alpha=0.5, label='vang Cas9')
 
     ax4.set_theta_zero_location("S")
     ax4.set_xticks(np.radians([0, 90, 180, 270]))
     ax4.set_xticklabels(['0°', '90°', '180°', '-90°'])
+    ax4.set_rlabel_position(135)
     ax4.set_title('Dorsal - Polar Histogram', va='bottom', pad=20)
     ax4.legend(loc='upper right', bbox_to_anchor=(1.3, 1.0))
+
+    # 左右のr軸を統一（最大確率に基づく）
+    max_prob = max(prob_test_l.max() if len(prob_test_l) > 0 else 0,
+                   prob_test_r.max() if len(prob_test_r) > 0 else 0)
+    r_max = max_prob * 1.1 if max_prob > 0 else 1  # 少し余裕を持たせる
+    ax3.set_rlim(0, r_max)
+    ax4.set_rlim(0, r_max)
 
     # Remove the default subplot created for polar plots
     axes[1, 0].remove()
@@ -599,7 +608,7 @@ def main():
     control_data = process_group(CONTROL_FILES, "Control")
 
     # Test群の処理
-    test_data = process_group(TEST_FILES, "Test")
+    test_data = process_group(TEST_FILES, "vang Cas9")
 
     # T検定の実行
     print("\n" + "="*70)
