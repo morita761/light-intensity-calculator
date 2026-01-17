@@ -85,7 +85,7 @@ def plot_combined_anova_table(anova_v, anova_d, title, filename=None):
     df_display['P値'] = df_combined['P値'].apply(format_p_value_scientific)
 
     # 図を作成
-    fig, ax = plt.subplots(figsize=(12, 4))
+    fig, ax = plt.subplots(figsize=(10, 4))
     ax.axis('tight')
     ax.axis('off')
 
@@ -100,8 +100,8 @@ def plot_combined_anova_table(anova_v, anova_d, title, filename=None):
 
     # スタイル調整
     table.auto_set_font_size(False)
-    table.set_fontsize(11)
-    table.scale(1.2, 1.8)
+    table.set_fontsize(13)
+    table.scale(1.0, 1.8)
 
     # ヘッダーの文字色を白に
     for i in range(len(df_display.columns)):
@@ -116,7 +116,7 @@ def plot_combined_anova_table(anova_v, anova_d, title, filename=None):
             for j in range(len(df_display.columns)):
                 table[(i+1, j)].set_facecolor('#FFF2E6')
 
-    ax.set_title(title, fontsize=14, fontweight='bold', pad=20)
+    ax.set_title(title, fontsize=14, fontweight='bold', pad=5)
 
     plt.tight_layout()
     if filename:
@@ -172,7 +172,7 @@ def plot_combined_tukey_table(tukey_v, tukey_d, title, filename=None):
     df_display['有意'] = df_combined['reject'].apply(lambda x: 'Yes' if x else 'No')
 
     # 図を作成
-    fig, ax = plt.subplots(figsize=(14, 4.5))
+    fig, ax = plt.subplots(figsize=(11, 4.5))
     ax.axis('tight')
     ax.axis('off')
 
@@ -187,8 +187,8 @@ def plot_combined_tukey_table(tukey_v, tukey_d, title, filename=None):
 
     # スタイル調整
     table.auto_set_font_size(False)
-    table.set_fontsize(10)
-    table.scale(1.2, 1.6)
+    table.set_fontsize(12)
+    table.scale(1.0, 1.6)
 
     # ヘッダーの文字色を白に
     for i in range(len(df_display.columns)):
@@ -203,7 +203,7 @@ def plot_combined_tukey_table(tukey_v, tukey_d, title, filename=None):
             for j in range(len(df_display.columns)):
                 table[(i+1, j)].set_facecolor('#FFFFE6')
 
-    ax.set_title(title, fontsize=14, fontweight='bold', pad=20)
+    ax.set_title(title, fontsize=14, fontweight='bold', pad=5)
 
     plt.tight_layout()
     if filename:
