@@ -452,6 +452,20 @@ def print_ttest_results(ventral_result, dorsal_result):
             print(" (n.s.)")
 
 
+def get_asterisks(p_value):
+    """p値からアスタリスクを返す"""
+    if np.isnan(p_value):
+        return 'n.s.'
+    elif p_value < 0.001:
+        return '***'
+    elif p_value < 0.01:
+        return '**'
+    elif p_value < 0.05:
+        return '*'
+    else:
+        return 'n.s.'
+
+
 def plot_results(control_data, test_data, ventral_result, dorsal_result):
     """結果を可視化"""
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
@@ -470,10 +484,16 @@ def plot_results(control_data, test_data, ventral_result, dorsal_result):
                   f"Control: n={ventral_result['control_n']}, "
                   f"mean={ventral_result['control_mean']:.1f}° ± {ventral_result['control_std']:.1f}°\n"
                   f"Test: n={ventral_result['test_n']}, "
-                  f"mean={ventral_result['test_mean']:.1f}° ± {ventral_result['test_std']:.1f}°\n"
-                  f"p = {ventral_result['p_value']:.10f}")
+                  f"mean={ventral_result['test_mean']:.1f}° ± {ventral_result['test_std']:.1f}°")
     ax1.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
-    ax1.set_ylim(-180, 180)
+    ax1.set_ylim(-180, 220)
+
+    # 線とアスタリスクの描画 (Ventral)
+    asterisks_ventral = get_asterisks(ventral_result['p_value'])
+    line_y1 = 185
+    star_y1 = line_y1 + 3
+    ax1.plot([1, 1, 2, 2], [line_y1, line_y1 + 5, line_y1 + 5, line_y1], lw=1.5, c='black')
+    ax1.text(1.5, star_y1, asterisks_ventral, ha='center', va='bottom', fontsize=14)
 
     # =================================
     # 2. Dorsal Box Plot (上段右)
@@ -489,10 +509,16 @@ def plot_results(control_data, test_data, ventral_result, dorsal_result):
                   f"Control: n={dorsal_result['control_n']}, "
                   f"mean={dorsal_result['control_mean']:.1f}° ± {dorsal_result['control_std']:.1f}°\n"
                   f"Test: n={dorsal_result['test_n']}, "
-                  f"mean={dorsal_result['test_mean']:.1f}° ± {dorsal_result['test_std']:.1f}°\n"
-                  f"p = {dorsal_result['p_value']:.10f}")
+                  f"mean={dorsal_result['test_mean']:.1f}° ± {dorsal_result['test_std']:.1f}°")
     ax2.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
-    ax2.set_ylim(-180, 180)
+    ax2.set_ylim(-180, 220)
+
+    # 線とアスタリスクの描画 (Dorsal)
+    asterisks_dorsal = get_asterisks(dorsal_result['p_value'])
+    line_y2 = 185
+    star_y2 = line_y2 + 3
+    ax2.plot([1, 1, 2, 2], [line_y2, line_y2 + 5, line_y2 + 5, line_y2], lw=1.5, c='black')
+    ax2.text(1.5, star_y2, asterisks_dorsal, ha='center', va='bottom', fontsize=14)
 
     # =================================
     # 3. Ventral Polar Histogram (下段左)
