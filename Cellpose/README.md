@@ -56,9 +56,10 @@ Cellpose は Janelia/HHMI（Stringer, Pachitariu ら）が開発した、蛍光�
 
 ```
 Cellpose/
-├── inference_test.py            # 事前学習モデルによるゼロショット検出テスト
+├── inference_test.py            # 事前学習/fine-tuning済みモデルによる検出テスト
 ├── dataset_prepare_from_coco.py # 既存のDetectron2用COCOアノテーションをCellpose形式に変換
-├── train_finetune.py            # 変換したデータでcpsam_v2をfine-tuning
+├── train_finetune.py            # 変換したデータでcpsam_v2をCLIでfine-tuning
+├── launch_gui.py                # Cellpose GUI起動（human-in-the-loop fine-tuning用）
 ├── func/
 │   └── vd_split.py              # V-D（左右）分割・輝度計算（Detectron2/func/と同ロジック）
 ├── results/                     # 検証結果の画像（本README用）
@@ -125,8 +126,50 @@ from cellpose import models
 model = models.CellposeModel(pretrained_model="./output/models/horseshoe_cpsam", gpu=True)
 ```
 
+### 4. GUIでのfine-tuning（human-in-the-loop）
+
+`train_finetune.py`（CLIで一括学習）とは別に、Cellpose公式GUIを使うと
+「ゼロショット推論 → マスクを手動修正 → その場でfine-tuning」のループを
+インタラクティブに回せる。**検証結果（2.実データでの検証）から、この
+プロジェクトの"horseshoe"は密なテクスチャの中の特定サブセットの選別が
+必要なため、GUIでの少数サンプル修正によるfine-tuningは特に有効な可能性が高い。**
+
+GUIの起動・手動修正・学習実行はディスプレイのある環境での操作が必要なため、
+本リポジトリでは起動スクリプトと事前準備（既存アノテーションの変換）までを用意している。
+実行・精度検証はユーザー側で行うこと。
+
+```bash
+# GUI依存パッケージのインストール（初回のみ）
+pip install "cellpose[gui]"
+
+# (推奨) 既存のCOCOアノテーションを変換しておくと、GUIで画像を開いた際に
+# "Autoload masks from _masks.tif file" を有効にするだけで変換済みマスクを
+# 初期状態として読み込める（ゼロから手動アノテーションし直さずに済む）
+python dataset_prepare_from_coco.py \
+    --coco ../Detectron2/annotations/train_annotations_horseshoe.json \
+    --images-dir ../data/train/images \
+    --out-dir ./cellpose_dataset/train
+
+# GUI起動（--imageは省略可、GUI内から開いてもよい）
+python launch_gui.py --image ./cellpose_dataset/train/001.png
+```
+
+GUI内での操作手順（詳細は `launch_gui.py` のdocstringにも記載）:
+
+1. File > *Load image* で画像を開く（`--image`指定時は自動で開かれる）
+2. File > *Autoload masks from _masks.tif file* を有効にしておくと、変換済みマスクが自動読込される
+3. 誤検出・見逃しをブラシ/右クリック削除で手動修正し、`Ctrl+S` で保存（`<画像名>_seg.npy` として保存）
+4. 同じフォルダ内の複数画像で 1-3 を繰り返す（`_seg.npy` が学習データになる）
+5. Models > *Train new model with image+masks in folder* を実行し、ダイアログで
+   `learning_rate` / `n_epochs` / `model_name` を設定して学習開始
+6. 学習後のモデルは `<フォルダ>/models/<model_name>` に保存され、GUIのモデル一覧にも自動追加される
+7. 保存されたモデルは以下でCLIからも利用できる:
+   ```bash
+   python inference_test.py --image <画像> --pretrained-model ./cellpose_dataset/train/models/<model_name>
+   ```
+
 ## 今後の課題
 
 - **本格的なfine-tuning**: 現状 `Detectron2/annotations/` にある85インスタンス（4画像）分のアノテーションで学習は可能だが、精度検証にはより多くのデータが必要。
-- **Cellpose GUI でのhuman-in-the-loop**: `cellpose` コマンドでGUIを起動し、ゼロショット推論結果を手動修正→再学習のループを回すと、少ない手間で精度を上げられる可能性がある。
+- **GUIでの human-in-the-loop の実運用**: 起動スクリプト・データ変換までは用意済み。実際の手動修正・学習・精度検証は未実施。
 - **V-D分割ロジックの共通化**: 現在 `func/vd_split.py` は `Detectron2/func/` の緑色HSV抽出ロジックを踏襲しているが、実データでの精度検証は未実施。

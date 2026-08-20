@@ -6,3 +6,6 @@ numpy
 matplotlib
 scikit-learn
 tifffile
+
+# GUIでの手動修正・human-in-the-loop fine-tuningを行う場合は追加でインストール:
+#   pip install "cellpose[gui]"

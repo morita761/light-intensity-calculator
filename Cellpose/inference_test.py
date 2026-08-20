@@ -53,15 +53,19 @@ def find_default_images():
     return synthetic[:1]
 
 
-def run_cellpose(image_path, diameter, use_gpu):
+def run_cellpose(image_path, diameter, use_gpu, pretrained_model=None):
     print(f"[画像読込] {image_path}")
     image = cp_io.imread(image_path)
     if image.ndim == 2:
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
     print(f"  shape={image.shape}, dtype={image.dtype}")
 
-    print("[モデル準備] CellposeModel (pretrained_model='cpsam_v2') ※初回はモデルを自動ダウンロードします")
-    model = models.CellposeModel(gpu=use_gpu)
+    if pretrained_model:
+        print(f"[モデル準備] CellposeModel (pretrained_model='{pretrained_model}') ※fine-tuning済みモデル")
+        model = models.CellposeModel(gpu=use_gpu, pretrained_model=pretrained_model)
+    else:
+        print("[モデル準備] CellposeModel (pretrained_model='cpsam_v2') ※初回はモデルを自動ダウンロードします")
+        model = models.CellposeModel(gpu=use_gpu)
 
     print(f"[推論実行] diameter={diameter}")
     masks, flows, styles = model.eval(image, diameter=diameter)
@@ -118,6 +122,13 @@ def main():
     )
     parser.add_argument("--gpu", action="store_true", help="GPUを使用する")
     parser.add_argument("--min-area", type=int, default=20, help="有効インスタンスとみなす最小面積(px^2)")
+    parser.add_argument(
+        "--pretrained-model",
+        type=str,
+        default=None,
+        help="fine-tuning済みモデルのパス（train_finetune.py または GUIのTrain new modelで生成）。"
+        "省略時は事前学習済みのcpsam_v2をゼロショットで使用。",
+    )
     args = parser.parse_args()
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -131,7 +142,7 @@ def main():
             )
         image_path = candidates[0]
 
-    image, masks = run_cellpose(image_path, args.diameter, args.gpu)
+    image, masks = run_cellpose(image_path, args.diameter, args.gpu, args.pretrained_model)
 
     instances = masks_to_instances(masks, min_area=args.min_area)
     center_x = green_center_x(image)
