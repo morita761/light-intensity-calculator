@@ -1,0 +1,8 @@
+cellpose>=4.2
+torch
+torchvision
+opencv-python
+numpy
+matplotlib
+scikit-learn
+tifffile

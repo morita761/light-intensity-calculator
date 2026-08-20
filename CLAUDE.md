@@ -28,6 +28,11 @@ light-intensity-calculator/
 │   ├── train.py          # Mask R-CNN学習スクリプト
 │   ├── inference_*.py    # 推論スクリプト群
 │   └── func/             # 輝度計算・分割処理
+├── Cellpose/             # Cellposeによる馬蹄形検出（検証中）
+│   ├── inference_test.py # 事前学習モデルのゼロショット検出テスト
+│   ├── dataset_prepare_from_coco.py # 既存COCOアノテーションの変換
+│   ├── train_finetune.py # fine-tuningスクリプト
+│   └── func/              # V-D分割・輝度計算
 ├── horseShoeShapeRecog/  # OpenCVによる従来手法（実験）
 ├── test-heatmap/         # ヒートマップ可視化
 ├── test_fig/             # 統計グラフ（箱ひげ図等）
@@ -47,6 +52,11 @@ light-intensity-calculator/
 - `**/inference_ver2_heatmaps.py` - 改良版ヒートマップ推論
 - `**/intensityCalc.py` - PCA + K-Meansによる左右分割・輝度計算
 - `**/splitobje.py` - 馬蹄形の分離処理
+
+### Cellpose（検証中の代替パイプライン、詳細は Cellpose/README.md）
+- `**/inference_test.py` - Cellpose-SAM事前学習モデルによるゼロショット検出テスト
+- `**/dataset_prepare_from_coco.py` - Detectron2用COCOアノテーションをCellpose形式に変換
+- `**/train_finetune.py` - 変換済みデータでのfine-tuning
 
 ### 可視化・統計
 - `**/boxplot_vd.py` - V-D分岐の箱ひげ図比較（t検定付き）

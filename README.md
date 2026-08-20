@@ -7,6 +7,7 @@
 ```
 light-intensity-calculator/
 ├── Detectron2/           # 深層学習による馬蹄形検出（メイン）
+├── Cellpose/             # Cellposeによる馬蹄形検出（検証中）
 ├── horseShoeShapeRecog/  # OpenCVによる従来手法（実験）
 ├── test-heatmap/         # ヒートマップ可視化
 ├── test_fig/             # 統計グラフ（箱ひげ図等）
@@ -47,6 +48,18 @@ python Detectron2/inference_split_calc.py
 # 推論（ヒートマップ付き）
 python Detectron2/inference_heatmaps.py
 ```
+
+---
+
+### Cellpose/（検証中）
+[Cellpose](https://github.com/MouseLand/cellpose)（Cellpose-SAM）を使った代替の馬蹄形検出パイプライン。詳細・検証結果は [`Cellpose/README.md`](Cellpose/README.md) を参照。
+
+| ファイル | 説明 |
+|---------|------|
+| `inference_test.py` | 事前学習モデル(cpsam_v2)によるゼロショット検出テスト |
+| `dataset_prepare_from_coco.py` | Detectron2用COCOアノテーションをCellpose形式に変換 |
+| `train_finetune.py` | 変換済みデータでのfine-tuning |
+| `func/vd_split.py` | V-D分割・輝度計算 |
 
 ---
 
