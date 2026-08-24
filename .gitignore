@@ -1,7 +1,26 @@
 /data
 /Detectron2/detectron2
-*/output/
+**/output/
 */pic/
 */pics/
 *.tif
 .o
+
+# Python
+__pycache__/
+*.py[cod]
+
+# OS
+.DS_Store
+
+# 学習済みモデル・チェックポイント（サイズが大きいため各自の環境で生成/取得する）
+*.pth
+*.pt
+*.npy
+*_seg.npy
+
+# TensorBoard ログ（Detectron2/tensorboard, Cellpose/output/tensorboard など）
+*.tfevents.*
+
+# Cellpose: dataset_prepare_from_coco.py で生成される中間データセット
+Cellpose/cellpose_dataset/

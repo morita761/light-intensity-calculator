@@ -53,7 +53,14 @@ def find_default_images():
     return synthetic[:1]
 
 
-def run_cellpose(image_path, diameter, use_gpu, pretrained_model=None):
+def run_cellpose(
+    image_path,
+    diameter,
+    use_gpu,
+    pretrained_model=None,
+    flow_threshold=0.4,
+    cellprob_threshold=0.0,
+):
     print(f"[画像読込] {image_path}")
     image = cp_io.imread(image_path)
     if image.ndim == 2:
@@ -67,8 +74,16 @@ def run_cellpose(image_path, diameter, use_gpu, pretrained_model=None):
         print("[モデル準備] CellposeModel (pretrained_model='cpsam_v2') ※初回はモデルを自動ダウンロードします")
         model = models.CellposeModel(gpu=use_gpu)
 
-    print(f"[推論実行] diameter={diameter}")
-    masks, flows, styles = model.eval(image, diameter=diameter)
+    print(
+        f"[推論実行] diameter={diameter}, flow_threshold={flow_threshold}, "
+        f"cellprob_threshold={cellprob_threshold}"
+    )
+    masks, flows, styles = model.eval(
+        image,
+        diameter=diameter,
+        flow_threshold=flow_threshold,
+        cellprob_threshold=cellprob_threshold,
+    )
     n_instances = int(masks.max())
     print(f"  検出インスタンス数: {n_instances}")
 
@@ -129,6 +144,19 @@ def main():
         help="fine-tuning済みモデルのパス（train_finetune.py または GUIのTrain new modelで生成）。"
         "省略時は事前学習済みのcpsam_v2をゼロショットで使用。",
     )
+    parser.add_argument(
+        "--flow-threshold",
+        type=float,
+        default=0.4,
+        help="flowエラーの許容閾値。小さくするほど検出が厳しくなる（誤検出が減るが見逃しが増える）。"
+        "組織テクスチャ由来の誤検出が多い場合に下げると絞り込める（README「検証結果」参照）。",
+    )
+    parser.add_argument(
+        "--cellprob-threshold",
+        type=float,
+        default=0.0,
+        help="細胞らしさ(cell probability)の閾値。上げるほど自信度の低い候補を除外する。",
+    )
     args = parser.parse_args()
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -142,7 +170,14 @@ def main():
             )
         image_path = candidates[0]
 
-    image, masks = run_cellpose(image_path, args.diameter, args.gpu, args.pretrained_model)
+    image, masks = run_cellpose(
+        image_path,
+        args.diameter,
+        args.gpu,
+        args.pretrained_model,
+        flow_threshold=args.flow_threshold,
+        cellprob_threshold=args.cellprob_threshold,
+    )
 
     instances = masks_to_instances(masks, min_area=args.min_area)
     center_x = green_center_x(image)

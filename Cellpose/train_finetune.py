@@ -16,12 +16,78 @@ Cellpose-SAM の事前学習モデル(cpsam_v2)を馬蹄形検出用にファイ
 
 使い方:
     python train_finetune.py --train-dir ./cellpose_dataset/train --test-dir ./cellpose_dataset/test
+
+学習の監視（loss / learning rate）:
+    学習完了後、以下を --save-path 以下に出力する。
+        <model_name>_loss_history.csv   epochごとのtrain/test loss
+        <model_name>_loss_curve.png     loss曲線のプロット
+        tensorboard/<model_name>/       TensorBoard用ログ（Detectron2と同じ見方でtotal_lossを確認可能）
+    TensorBoardでの確認:
+        tensorboard --logdir <save-path>/tensorboard
+    Cellposeのtrain_seg()はlearning_rateを固定値（またはcosine decay、cellpose内部実装依存）として
+    扱うため、動的な学習率スケジュールそのものは公開されていない。ここでは実行時に指定した
+    --learning-rate の値をTensorBoardに定数として記録し、どの学習率で学習したログかを追跡できるようにする。
 """
 import argparse
+import csv
 import os
 
 from cellpose import io as cp_io
 from cellpose import models, train
+
+
+def save_loss_history(save_path, model_name, train_losses, test_losses, learning_rate):
+    """
+    epochごとのtrain/test lossをCSV保存し、TensorBoardにも記録する。
+    Detectron2/tensorboard/README.md と同じ「total_lossが下がっているか/収束したか/
+    振動していないか」という観点でCellposeの学習も監視できるようにする。
+    """
+    n_epochs = len(train_losses)
+    csv_path = os.path.join(save_path, f"{model_name}_loss_history.csv")
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["epoch", "train_loss", "test_loss"])
+        for epoch in range(n_epochs):
+            test_loss = test_losses[epoch] if test_losses is not None and epoch < len(test_losses) else ""
+            writer.writerow([epoch, train_losses[epoch], test_loss])
+    print(f"[loss履歴] {csv_path}")
+
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.plot(range(n_epochs), train_losses, label="train_loss")
+        if test_losses is not None and len(test_losses) > 0:
+            ax.plot(range(len(test_losses)), test_losses, label="test_loss")
+        ax.set_xlabel("epoch")
+        ax.set_ylabel("loss")
+        ax.set_title(f"{model_name} loss curve (learning_rate={learning_rate})")
+        ax.legend()
+        fig.tight_layout()
+        png_path = os.path.join(save_path, f"{model_name}_loss_curve.png")
+        fig.savefig(png_path, dpi=110)
+        plt.close(fig)
+        print(f"[loss曲線] {png_path}")
+    except ImportError:
+        print("[警告] matplotlibが無いためloss曲線のプロットをスキップしました")
+
+    try:
+        from torch.utils.tensorboard import SummaryWriter
+
+        log_dir = os.path.join(save_path, "tensorboard", model_name)
+        writer = SummaryWriter(log_dir=log_dir)
+        for epoch in range(n_epochs):
+            writer.add_scalar("loss/train", train_losses[epoch], epoch)
+            if test_losses is not None and epoch < len(test_losses):
+                writer.add_scalar("loss/test", test_losses[epoch], epoch)
+            writer.add_scalar("learning_rate", learning_rate, epoch)
+        writer.close()
+        print(f"[TensorBoard] {log_dir}  (確認: tensorboard --logdir {os.path.join(save_path, 'tensorboard')})")
+    except ImportError:
+        print("[警告] tensorboardが無いためTensorBoardログの出力をスキップしました（pip install tensorboard）")
 
 
 def main():
@@ -61,6 +127,8 @@ def main():
         model_name=args.model_name,
         save_path=args.save_path,
     )
+
+    save_loss_history(args.save_path, args.model_name, train_losses, test_losses, args.learning_rate)
 
     print(f"[完了] モデル保存先: {model_path}")
     print("推論時は models.CellposeModel(pretrained_model=<model_path>) で読み込めます。")

@@ -57,8 +57,9 @@ Cellpose は Janelia/HHMI（Stringer, Pachitariu ら）が開発した、蛍光�
 ```
 Cellpose/
 ├── inference_test.py            # 事前学習/fine-tuning済みモデルによる検出テスト
+├── estimate_diameter.py         # COCOアノテーションから推奨diameterを算出
 ├── dataset_prepare_from_coco.py # 既存のDetectron2用COCOアノテーションをCellpose形式に変換
-├── train_finetune.py            # 変換したデータでcpsam_v2をCLIでfine-tuning
+├── train_finetune.py            # 変換したデータでcpsam_v2をCLIでfine-tuning（loss/TensorBoard記録付き）
 ├── launch_gui.py                # Cellpose GUI起動（human-in-the-loop fine-tuning用）
 ├── func/
 │   └── vd_split.py              # V-D（左右）分割・輝度計算（Detectron2/func/と同ロジック）
@@ -76,17 +77,38 @@ pip install -r requirements.txt
 
 ## 使い方
 
+### 0. diameterの推定（推奨・初回のみ）
+
+「検証結果」の通り、Cellposeの検出精度は `diameter` を対象の実サイズに合わせられるかに大きく依存する。
+毎回目視・手計算する代わりに、既存のCOCOアノテーションから機械的に推奨値を算出できる。
+
+```bash
+python estimate_diameter.py --coco ../Detectron2/annotations/train_annotations_horseshoe.json
+```
+
+```
+インスタンス数: 85
+等価直径(2*sqrt(area/pi)) 平均: 35.5px  (min=3.4, max=46.1)
+bbox幅 平均: 46.9px, bbox高さ 平均: 34.0px
+
+推奨: python inference_test.py --diameter 35 ...
+```
+
 ### 1. ゼロショットでの動作確認
 
 ```bash
 # デフォルト: pic/ 内のTIFF（あれば）、無ければ合成データにフォールバック
 python inference_test.py
 
-# 画像とdiameterを指定（実データでは40前後を推奨、上記「検証結果」参照）
+# 画像とdiameterを指定（上記0.の推奨値、または実データでは40前後を推奨。「検証結果」参照）
 python inference_test.py --image ../pic/up_Fz_green_stronger_selected_2_blue.tif --diameter 40
 
 # GPU使用時
 python inference_test.py --gpu --diameter 40
+
+# flow_threshold/cellprob_thresholdで検出の厳しさを調整
+# （組織テクスチャ由来の誤検出を絞り込みたい場合はflow_thresholdを下げる）
+python inference_test.py --diameter 40 --flow-threshold 0.2 --cellprob-threshold 0.5
 ```
 
 結果は `./output/<画像名>_cellpose_test.png` に保存される。V-D分割（緑色領域の中心を境にした左右分割）と各側の平均輝度もコンソールに出力される。
@@ -126,6 +148,33 @@ from cellpose import models
 model = models.CellposeModel(pretrained_model="./output/models/horseshoe_cpsam", gpu=True)
 ```
 
+#### 学習の監視（loss / learning rate）
+
+学習完了時に `--save-path`（デフォルト `./output`）以下へ以下を出力する。
+
+| ファイル | 内容 |
+|---------|------|
+| `<model_name>_loss_history.csv` | epochごとのtrain_loss / test_loss |
+| `<model_name>_loss_curve.png` | 上記のプロット画像 |
+| `tensorboard/<model_name>/` | TensorBoard用ログ（loss/train, loss/test, learning_rate） |
+
+TensorBoardで確認する場合:
+
+```bash
+tensorboard --logdir ./output/tensorboard
+```
+
+見るべき点は `Detectron2/tensorboard/README.md` と同様:
+- **train_loss / test_loss が下がっているか**: 順調に学習が進んでいればepochごとに減少する。
+- **収束しているか**: 途中から横ばいになれば、それ以上 `--n-epochs` を増やしても効果は薄い。
+- **test_lossだけ途中から増加（過学習）**: train_lossは下がり続けるがtest_lossが増加に転じた場合、
+  そのepoch付近のモデルの方が汎化性能は高い可能性がある。学習データを増やすか `--n-epochs` を減らして再学習する。
+- **振動（スパイク）**: `--learning-rate` が高すぎる可能性がある（デフォルト `1e-5` を下げてみる）。
+
+なお `learning_rate` はTensorBoardに定数として記録しているだけで、Cellpose内部の動的なスケジュール自体を
+可視化しているわけではない（`train.train_seg()` は公開APIとして学習率スケジュールを返さないため）。
+複数の学習率を比較したい場合は `--model-name` を変えて複数回実行し、TensorBoard上で並べて比較する。
+
 ### 4. GUIでのfine-tuning（human-in-the-loop）
 
 `train_finetune.py`（CLIで一括学習）とは別に、Cellpose公式GUIを使うと
@@ -162,14 +211,24 @@ GUI内での操作手順（詳細は `launch_gui.py` のdocstringにも記載）
 4. 同じフォルダ内の複数画像で 1-3 を繰り返す（`_seg.npy` が学習データになる）
 5. Models > *Train new model with image+masks in folder* を実行し、ダイアログで
    `learning_rate` / `n_epochs` / `model_name` を設定して学習開始
+   （GUIは学習中にtrain/test lossの推移をウィンドウ内にリアルタイム表示する。急激な発散や
+   0付近での停滞が見えたら、`learning_rate` を下げる/上げるかサンプル数を見直す）
 6. 学習後のモデルは `<フォルダ>/models/<model_name>` に保存され、GUIのモデル一覧にも自動追加される
 7. 保存されたモデルは以下でCLIからも利用できる:
    ```bash
    python inference_test.py --image <画像> --pretrained-model ./cellpose_dataset/train/models/<model_name>
    ```
+   CLIの `train_finetune.py` と違い、GUI経由の学習では loss_history.csv / TensorBoardログは
+   自動生成されない（GUI内のリアルタイム表示のみ）。学習後にCSV等で振り返りたい場合は、
+   同じデータで `train_finetune.py --model-name <同じ名前>` を実行し直すとよい。
 
 ## 今後の課題
 
 - **本格的なfine-tuning**: 現状 `Detectron2/annotations/` にある85インスタンス（4画像）分のアノテーションで学習は可能だが、精度検証にはより多くのデータが必要。
 - **GUIでの human-in-the-loop の実運用**: 起動スクリプト・データ変換までは用意済み。実際の手動修正・学習・精度検証は未実施。
 - **V-D分割ロジックの共通化**: 現在 `func/vd_split.py` は `Detectron2/func/` の緑色HSV抽出ロジックを踏襲しているが、実データでの精度検証は未実施。
+- **「真のhorseshoe」選別の自動化**: `estimate_diameter.py` によるスケール合わせ、`inference_test.py` の
+  `--flow-threshold` / `--cellprob-threshold` による絞り込みまでは実装済みだが、それでも残る
+  組織テクスチャ由来の誤検出をどう除外するか（形状の凹み具合でのフィルタリング等）は未検証。
+- **fine-tuning後の`--flow-threshold`/`--cellprob-threshold`再チューニング**: これらの閾値の最適値は
+  ゼロショット時と学習後で変わりうるため、fine-tuning後のモデルで改めて検証用データに対し調整が必要。

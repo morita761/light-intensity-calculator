@@ -54,9 +54,10 @@ light-intensity-calculator/
 - `**/splitobje.py` - 馬蹄形の分離処理
 
 ### Cellpose（検証中の代替パイプライン、詳細は Cellpose/README.md）
-- `**/inference_test.py` - Cellpose-SAM事前学習/fine-tuning済みモデルによる検出テスト
+- `**/inference_test.py` - Cellpose-SAM事前学習/fine-tuning済みモデルによる検出テスト（diameter/flow_threshold/cellprob_threshold指定可）
+- `**/estimate_diameter.py` - COCOアノテーションから推奨diameterを算出
 - `**/dataset_prepare_from_coco.py` - Detectron2用COCOアノテーションをCellpose形式に変換
-- `**/train_finetune.py` - 変換済みデータでのCLI fine-tuning
+- `**/train_finetune.py` - 変換済みデータでのCLI fine-tuning（loss履歴CSV・TensorBoardログ出力付き）
 - `**/launch_gui.py` - Cellpose GUI起動（human-in-the-loop fine-tuning用、実行・検証はユーザー側）
 
 ### 可視化・統計

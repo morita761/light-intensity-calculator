@@ -56,9 +56,10 @@ python Detectron2/inference_heatmaps.py
 
 | ファイル | 説明 |
 |---------|------|
-| `inference_test.py` | 事前学習モデル(cpsam_v2)によるゼロショット検出テスト |
+| `inference_test.py` | 事前学習モデル(cpsam_v2)によるゼロショット検出テスト（diameter/flow_threshold/cellprob_threshold指定可） |
+| `estimate_diameter.py` | COCOアノテーションから推奨diameterを算出 |
 | `dataset_prepare_from_coco.py` | Detectron2用COCOアノテーションをCellpose形式に変換 |
-| `train_finetune.py` | 変換済みデータでのfine-tuning |
+| `train_finetune.py` | 変換済みデータでのfine-tuning（loss履歴CSV・TensorBoardログ出力付き） |
 | `func/vd_split.py` | V-D分割・輝度計算 |
 
 ---
