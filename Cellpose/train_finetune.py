@@ -35,6 +35,8 @@ import os
 from cellpose import io as cp_io
 from cellpose import models, train
 
+from func.cli_errors import run_main
+
 
 def save_loss_history(save_path, model_name, train_losses, test_losses, learning_rate):
     """
@@ -102,6 +104,11 @@ def main():
     parser.add_argument("--gpu", action="store_true")
     args = parser.parse_args()
 
+    if not os.path.isdir(args.train_dir):
+        raise NotADirectoryError(f"--train-dir が見つかりません: {args.train_dir}")
+    if args.test_dir is not None and not os.path.isdir(args.test_dir):
+        raise NotADirectoryError(f"--test-dir が見つかりません: {args.test_dir}")
+
     os.makedirs(args.save_path, exist_ok=True)
 
     print("[データ読込]")
@@ -135,4 +142,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_main(main)

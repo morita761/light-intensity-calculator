@@ -41,8 +41,11 @@ GUI内での操作手順（このスクリプトは起動のみ。以降は手�
        CLIからも利用できる
 """
 import argparse
+import os
 
 from cellpose.gui import gui
+
+from func.cli_errors import run_main
 
 
 def main():
@@ -55,6 +58,9 @@ def main():
     )
     args = parser.parse_args()
 
+    if args.image is not None and not os.path.isfile(args.image):
+        raise FileNotFoundError(f"--image が見つかりません: {args.image}")
+
     print("Cellpose GUIを起動します。")
     print("手順は launch_gui.py 冒頭のdocstringを参照してください。")
     if args.image:
@@ -64,4 +70,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_main(main)

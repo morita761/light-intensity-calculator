@@ -27,6 +27,8 @@ import cv2
 import numpy as np
 import tifffile
 
+from func.cli_errors import run_main
+
 
 def build_instance_mask(height, width, annotations, category_id):
     """
@@ -54,6 +56,9 @@ def main():
         "--category-name", default="horseshoe", help="ラベル化する対象カテゴリ名（デフォルト: horseshoe）"
     )
     args = parser.parse_args()
+
+    if not os.path.isdir(args.images_dir):
+        raise NotADirectoryError(f"--images-dir が見つかりません: {args.images_dir}")
 
     with open(args.coco, "r") as f:
         coco = json.load(f)
@@ -102,4 +107,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_main(main)

@@ -13,50 +13,73 @@ import numpy as np
 import torch
 import os
 
-# データセット登録
+from func.cli_errors import require_dir, require_file, run_main
 
-register_coco_instances("horseshoe_train", {}, "train_annotations.json", "../data/train/images/")
-register_coco_instances("horseshoe_val", {}, "val_annotations.json", "../data/val/images/")
+# データセット登録用のパス設定（学習を実行するディレクトリからの相対パス）
+TRAIN_ANNOTATIONS = "train_annotations.json"
+VAL_ANNOTATIONS = "val_annotations.json"
+TRAIN_IMAGES_DIR = "../data/train/images/"
+VAL_IMAGES_DIR = "../data/val/images/"
+BASE_CONFIG_YAML = "detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"
+PRETRAINED_WEIGHTS = "../data/model/model_final_f10217.pkl"  # ダウンロードしたファイルの相対パス
 
-cfg = get_cfg()
-# Mask R-CNN R50-FPN
-cfg.merge_from_file("detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml")
-# cfg.MODEL.WEIGHTS = "detectron2://ImageNetPretrained/MSRA/R-50.pkl"
-# https://communicity-docs.readthedocs.io/en/latest/src/communicity_toolbox/toolbox/Models/detectron2/README.html
-cfg.MODEL.WEIGHTS = "../data/model/model_final_f10217.pkl" # ダウンロードしたファイルの相対パス
 
-# cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
-# cfg.MODEL.WEIGHTS = "detectron2://COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x/137849600/model_final_f1027.pkl"
+def build_cfg():
+    """
+    学習に必要なファイル（アノテーションJSON・画像ディレクトリ・configファイル・
+    事前学習済み重み）が揃っているか確認したうえで、Detectron2の設定(cfg)を組み立てる。
+    """
+    require_file(TRAIN_ANNOTATIONS, "学習用アノテーションJSON")
+    require_dir(TRAIN_IMAGES_DIR, "学習用画像ディレクトリ")
+    require_file(VAL_ANNOTATIONS, "検証用アノテーションJSON")
+    require_dir(VAL_IMAGES_DIR, "検証用画像ディレクトリ")
+    require_file(BASE_CONFIG_YAML, "Detectron2のベースconfig(yaml)")
+    require_file(PRETRAINED_WEIGHTS, "事前学習済み重み(.pkl)")
 
-# Mask R-CNN R101-FPN (3x schedule). ResNet-50の代わりに、より深いResNet-101をバックボーンに使用したモデル
-# cfg.merge_from_file("detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_101_FPN_3x.yaml")
-# cfg.MODEL.WEIGHTS = "detectron2://COCO-InstanceSegmentation/mask_rcnn_R_101_FPN_3x/138205316/model_final_a3ec72.pkl"
+    register_coco_instances("horseshoe_train", {}, TRAIN_ANNOTATIONS, TRAIN_IMAGES_DIR)
+    register_coco_instances("horseshoe_val", {}, VAL_ANNOTATIONS, VAL_IMAGES_DIR)
 
-# cfg.merge_from_file("detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml")
-# cfg.MODEL.WEIGHTS = "detectron2://COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x/139653917/model_final_2d9806.pkl"
+    cfg = get_cfg()
+    # Mask R-CNN R50-FPN
+    cfg.merge_from_file(BASE_CONFIG_YAML)
+    # cfg.MODEL.WEIGHTS = "detectron2://ImageNetPretrained/MSRA/R-50.pkl"
+    # https://communicity-docs.readthedocs.io/en/latest/src/communicity_toolbox/toolbox/Models/detectron2/README.html
+    cfg.MODEL.WEIGHTS = PRETRAINED_WEIGHTS
 
-cfg.DATASETS.TRAIN = ("horseshoe_train",)
-cfg.DATASETS.TEST = ("horseshoe_val",)
-# cfg.DATASETS.TEST = ()
-cfg.DATALOADER.NUM_WORKERS = 2
-# cfg.OUTPUT_DIR = "./output/0922"
-cfg.OUTPUT_DIR = "./output/20260112/"
+    # cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
+    # cfg.MODEL.WEIGHTS = "detectron2://COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x/137849600/model_final_f1027.pkl"
 
-cfg.SOLVER.IMS_PER_BATCH = 2
-cfg.SOLVER.BASE_LR = 0.0001
-# cfg.SOLVER.MAX_ITER = 300
-cfg.SOLVER.MAX_ITER = 270000
-cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 128
-cfg.MODEL.ROI_HEADS.NUM_CLASSES = 2  # horseshoe, negative
-cfg.TEST.EVAL_PERIOD = 50 # 50イテレーションごとに評価を実行（任意、デフォルトは0）
-# 例: 1000イテレーションごとにモデルを出力したい場合
-cfg.SOLVER.CHECKPOINT_PERIOD = 1000
-# 以下の設定を追加するか、既存の設定を確認・変更
-# cfg.SOLVER.STEPS = (10000, 15000) # 例: 1万回と1.5万回で学習率を10分の1に減衰
-# 減衰率も確認
-# cfg.SOLVER.GAMMA = 0.1 # 減衰時に学習率が乗算される値 (通常は0.1)
+    # Mask R-CNN R101-FPN (3x schedule). ResNet-50の代わりに、より深いResNet-101をバックボーンに使用したモデル
+    # cfg.merge_from_file("detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_101_FPN_3x.yaml")
+    # cfg.MODEL.WEIGHTS = "detectron2://COCO-InstanceSegmentation/mask_rcnn_R_101_FPN_3x/138205316/model_final_a3ec72.pkl"
 
-os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
+    # cfg.merge_from_file("detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml")
+    # cfg.MODEL.WEIGHTS = "detectron2://COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x/139653917/model_final_2d9806.pkl"
+
+    cfg.DATASETS.TRAIN = ("horseshoe_train",)
+    cfg.DATASETS.TEST = ("horseshoe_val",)
+    # cfg.DATASETS.TEST = ()
+    cfg.DATALOADER.NUM_WORKERS = 2
+    # cfg.OUTPUT_DIR = "./output/0922"
+    cfg.OUTPUT_DIR = "./output/20260112/"
+
+    cfg.SOLVER.IMS_PER_BATCH = 2
+    cfg.SOLVER.BASE_LR = 0.0001
+    # cfg.SOLVER.MAX_ITER = 300
+    cfg.SOLVER.MAX_ITER = 270000
+    cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 128
+    cfg.MODEL.ROI_HEADS.NUM_CLASSES = 2  # horseshoe, negative
+    cfg.TEST.EVAL_PERIOD = 50 # 50イテレーションごとに評価を実行（任意、デフォルトは0）
+    # 例: 1000イテレーションごとにモデルを出力したい場合
+    cfg.SOLVER.CHECKPOINT_PERIOD = 1000
+    # 以下の設定を追加するか、既存の設定を確認・変更
+    # cfg.SOLVER.STEPS = (10000, 15000) # 例: 1万回と1.5万回で学習率を10分の1に減衰
+    # 減衰率も確認
+    # cfg.SOLVER.GAMMA = 0.1 # 減衰時に学習率が乗算される値 (通常は0.1)
+
+    os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
+    return cfg
+
 
 def custom_mapper(dataset_dict):
     import copy
@@ -185,7 +208,8 @@ class CustomTrainer(DefaultTrainer):
         # デバッグコードを一度だけ実行するためのフラグ
         self._debug_run = False
 
-if __name__ == "__main__":
+def main():
+    cfg = build_cfg()
     trainer = CustomTrainer(cfg)
     # trainer = DefaultTrainer(cfg)
     # trainer.resume_or_load(resume=True) # 必要に応じて以前のチェックポイントから再開
@@ -193,3 +217,7 @@ if __name__ == "__main__":
 
     # print("データ拡張の確認を実行します。学習は開始されません。") # 拡張結果だけを見たい場合に実行
     # CustomTrainer.debug_data_augmentation(cfg)               # コメントを外す
+
+
+if __name__ == "__main__":
+    run_main(main)

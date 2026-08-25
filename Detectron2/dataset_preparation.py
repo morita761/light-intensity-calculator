@@ -5,6 +5,8 @@ import os
 from PIL import Image
 import glob
 
+from func.cli_errors import require_dir, run_main
+
 
 # アノテーションに使用する色のHSV範囲を定義
 ANNOTATION_COLORS_HSV = {
@@ -97,6 +99,9 @@ def create_coco_annotations(img_dir, mask_dir, output_json_path, use_multicolor=
         output_json_path: 出力JSONパス
         use_multicolor: True=複数色対応（赤=negative, 他=horseshoe）, False=青のみ
     """
+    require_dir(img_dir, "img_dir（画像ディレクトリ）")
+    require_dir(mask_dir, "mask_dir（マスクディレクトリ）")
+
     image_files = sorted(glob.glob(os.path.join(img_dir, "*.tif")))
 
     # .tifがない場合は.pngも探す
@@ -211,7 +216,7 @@ def create_coco_annotations(img_dir, mask_dir, output_json_path, use_multicolor=
     print(f"   negative: {negative_count}個")
 
 
-if __name__ == "__main__":
+def main():
     # 学習データ（複数色対応）
     create_coco_annotations(
         img_dir="../data/train/images",
@@ -227,3 +232,7 @@ if __name__ == "__main__":
         output_json_path="val_annotations.json",
         use_multicolor=True
     )
+
+
+if __name__ == "__main__":
+    run_main(main)

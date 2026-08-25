@@ -15,6 +15,8 @@ import argparse
 import json
 import math
 
+from func.cli_errors import run_main
+
 
 def polygon_area(seg):
     """
@@ -78,4 +80,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_main(main)

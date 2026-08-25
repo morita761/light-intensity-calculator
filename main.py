@@ -1,3 +1,5 @@
+import sys
+
 import gptFunc
 import horseShoeShapeRecog.Dog as horse
 # import horseShoeShapeRecog.gptFunc as horse
@@ -6,8 +8,19 @@ import tempHorseshoe as tempH
 import matchesTemplate as match
 import brightnessMeasure as bright
 
+IMAGE_PATH = "pic/up_Fz_green_stronger.tif"
+
 if __name__ == "__main__":
-    image = cv2.imread("pic/up_Fz_green_stronger.tif")  # 入力画像を読み込み
+    image = cv2.imread(IMAGE_PATH)  # 入力画像を読み込み
+    if image is None:
+        print(
+            f"エラー: 入力画像を読み込めませんでした: {IMAGE_PATH}\n"
+            f"  原因: ファイルが存在しないか、画像として読み込めない形式です。\n"
+            f"  対処: pic/ ディレクトリに '{IMAGE_PATH.split('/')[-1]}' を配置するか、"
+            f"main.py 冒頭の IMAGE_PATH を実際の画像パスに変更してください。",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     # ウィンドウを作成
     cv2.namedWindow('Sample Image', cv2.WINDOW_NORMAL)
     cv2.namedWindow('Sample Image2', cv2.WINDOW_NORMAL)

@@ -10,6 +10,9 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 import sys
+import argparse
+
+from func.cli_errors import require_file, run_main
 
 # --- Detectron2 Configuration ---
 def setup_predictor(model_path, score_threshold=0.25):
@@ -105,9 +108,10 @@ def process_images(input_paths, predictor, class_names):
     all_masks_left_total = []
     all_masks_right_total = []
     debug_images = []
-    
+    image_cropped = None
+
     # ["horseshoe", "negative_green_region"]
-    horseshoe_class_id = class_names.index('horseshoe') 
+    horseshoe_class_id = class_names.index('horseshoe')
 
     for i, input_path in enumerate(input_paths):
         image = cv2.imread(input_path)
@@ -212,22 +216,55 @@ def plot_results(debug_images, heatmap_left, heatmap_right):
     plt.show()
 
 # --- Main Execution ---
-if __name__ == "__main__":
-    predictor = setup_predictor("./output/model_final.pth", score_threshold=0.3)
-    
+def main():
+    parser = argparse.ArgumentParser(
+        description="Detectron2による馬蹄形検出 + V-D分割ヒートマップ生成（改良版）"
+    )
+    parser.add_argument(
+        "--model-path", default="./output/model_final.pth", help="学習済みモデル重み(.pth)のパス"
+    )
+    parser.add_argument(
+        "--images",
+        nargs="+",
+        default=["./output/004.tif", "./output/6.tif", "./output/003.tif"],
+        help="推論対象の入力画像パス（複数指定可）",
+    )
+    parser.add_argument("--score-threshold", type=float, default=0.3, help="検出の信頼度閾値")
+    args = parser.parse_args()
+
+    require_file(args.model_path, "学習済みモデル(--model-path)")
+    existing_images = [p for p in args.images if os.path.isfile(p)]
+    if not existing_images:
+        raise FileNotFoundError(
+            f"--images で指定された画像が1枚も見つかりません: {args.images}"
+        )
+    missing_images = set(args.images) - set(existing_images)
+    for p in missing_images:
+        print(f"警告: 画像ファイル '{p}' が見つかりません。スキップします。")
+
+    predictor = setup_predictor(args.model_path, score_threshold=args.score_threshold)
+
     # ここでクラス名を定義。モデルの学習時のクラス順序と一致させる必要があります。
     # 0:'background', 1:'horseshoe'
     class_names = ["horseshoe", "negative_green_region"]
     MetadataCatalog.get("my_dataset_train").set(thing_classes=class_names)
-    
-    input_paths = ["./output/004.tif", "./output/6.tif", "./output/003.tif"]
-    
-    all_masks_left, all_masks_right, debug_images, image_cropped = process_images(input_paths, predictor, class_names)
-    
+
+    all_masks_left, all_masks_right, debug_images, image_cropped = process_images(
+        existing_images, predictor, class_names
+    )
+    if image_cropped is None:
+        raise ValueError(
+            "指定された画像から馬蹄形を検出できませんでした（全画像で読み込み/検出に失敗）。"
+        )
+
     target_size = (100, 100)
     heatmap_left = create_average_heatmap(all_masks_left, image_cropped, target_size)
     heatmap_right = create_average_heatmap(all_masks_right, image_cropped, target_size)
-    
+
     plot_results(debug_images, heatmap_left, heatmap_right)
-    
+
     cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    run_main(main)

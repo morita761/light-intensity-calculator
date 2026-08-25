@@ -28,6 +28,7 @@ import numpy as np
 from cellpose import io as cp_io
 from cellpose import models
 
+from func.cli_errors import run_main
 from func.vd_split import (
     green_center_x,
     masks_to_instances,
@@ -195,4 +196,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_main(main)
