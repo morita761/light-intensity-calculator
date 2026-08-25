@@ -34,12 +34,12 @@ light-intensity-calculator/
 │   ├── train_finetune.py # fine-tuningスクリプト
 │   └── func/              # V-D分割・輝度計算
 ├── horseShoeShapeRecog/  # OpenCVによる従来手法（実験）
-├── test-heatmap/         # ヒートマップ可視化
-├── test_fig/             # 統計グラフ（箱ひげ図等）
-├── test-histogram/       # ヒストグラム処理テスト
-├── test-gradient/        # グラデーション処理テスト
-├── test-circle/          # 円検出テスト
-├── test_arrow/           # 矢印検出・極座標ヒストグラム
+├── heatmap/              # ヒートマップ可視化
+├── stats_figures/        # 統計グラフ（箱ひげ図等）
+├── histogram/            # ヒストグラム処理テスト
+├── gradient/             # グラデーション処理テスト
+├── circle_detection/     # 円検出テスト
+├── arrow_analysis/       # 矢印検出・極座標ヒストグラム
 ├── pic/                  # テンプレート画像
 ├── archive/              # 過去の実験コード（Keras/PyTorch U-Net）
 └── ルートファイル         # 従来手法のメインスクリプト
@@ -60,7 +60,7 @@ light-intensity-calculator/
 - `**/train_finetune.py` - 変換済みデータでのCLI fine-tuning（loss履歴CSV・TensorBoardログ出力付き）
 - `**/launch_gui.py` - Cellpose GUI起動（human-in-the-loop fine-tuning用、実行・検証はユーザー側）
 
-### 可視化・統計
+### 可視化・統計（stats_figures/, heatmap/, arrow_analysis/）
 - `**/boxplot_vd.py` - V-D分岐の箱ひげ図比較（t検定付き）
 - `**/mosaic_horseshoe.py` - モザイク実験用ヒートマップ
 - `**/orientation-polar-histogram.py` - 極座標ヒストグラム

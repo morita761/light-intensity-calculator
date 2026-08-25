@@ -1,4 +1,4 @@
-# test_fig
+# stats_figures
 
 統計解析用のグラフ生成フォルダ。Ventral/Dorsal間の輝度比較分析を行う。
 

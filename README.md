@@ -9,12 +9,12 @@ light-intensity-calculator/
 ├── Detectron2/           # 深層学習による馬蹄形検出（メイン）
 ├── Cellpose/             # Cellposeによる馬蹄形検出（検証中）
 ├── horseShoeShapeRecog/  # OpenCVによる従来手法（実験）
-├── test-heatmap/         # ヒートマップ可視化
-├── test_fig/             # 統計グラフ（箱ひげ図等）
-├── test-histogram/       # ヒストグラム処理テスト
-├── test-gradient/        # グラデーション処理テスト
-├── test-circle/          # 円検出テスト
-├── test_arrow/           # 矢印検出テスト
+├── heatmap/              # ヒートマップ可視化
+├── stats_figures/        # 統計グラフ（箱ひげ図等）
+├── histogram/            # ヒストグラム処理テスト
+├── gradient/             # グラデーション処理テスト
+├── circle_detection/     # 円検出テスト
+├── arrow_analysis/       # 矢印検出テスト
 ├── pic/                  # テンプレート画像
 ├── archive/              # 過去の実験コード
 └── ルートファイル         # 従来手法のメインスクリプト
@@ -64,7 +64,7 @@ python Detectron2/inference_heatmaps.py
 
 ---
 
-### test-heatmap/
+### heatmap/
 馬蹄形の輝度分布をヒートマップで可視化。Seaborn/matplotlibを使用。
 
 | ファイル | 説明 |
@@ -76,7 +76,7 @@ python Detectron2/inference_heatmaps.py
 
 ---
 
-### test_fig/
+### stats_figures/
 統計解析用のグラフ生成。Ventral/Dorsal間の比較分析。
 
 | ファイル | 説明 |
@@ -98,7 +98,7 @@ OpenCVを使用した従来的な画像処理手法。Detectron2導入前の実�
 
 ---
 
-### test-histogram/, test-gradient/, test-circle/, test_arrow/
+### histogram/, gradient/, circle_detection/, arrow_analysis/
 各種画像処理手法のテスト・実験用フォルダ。
 
 ---
