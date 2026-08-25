@@ -55,6 +55,7 @@ light-intensity-calculator/
 
 ### Cellpose（検証中の代替パイプライン、詳細は Cellpose/README.md）
 - `**/inference_test.py` - Cellpose-SAM事前学習/fine-tuning済みモデルによる検出テスト（diameter/flow_threshold/cellprob_threshold指定可）
+- `**/inference_nd2_zstack.py` - ND2 Z-stack（1画像あたり約20枚のZスライス）対応の改善版パイプライン。Z-stackを複数範囲（全Z-stack／5枚ずつ3枚おきにずらした範囲）に分けて重ね合わせ、範囲ごとに独立して検出・結果保存。summary.csv/comparison_montage.pngで比較評価可能
 - `**/estimate_diameter.py` - COCOアノテーションから推奨diameterを算出
 - `**/dataset_prepare_from_coco.py` - Detectron2用COCOアノテーションをCellpose形式に変換
 - `**/train_finetune.py` - 変換済みデータでのCLI fine-tuning（loss履歴CSV・TensorBoardログ出力付き）

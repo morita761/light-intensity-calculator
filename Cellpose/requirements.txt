@@ -7,6 +7,7 @@ matplotlib
 scikit-learn
 tifffile
 tensorboard
+nd2
 
 # GUIでの手動修正・human-in-the-loop fine-tuningを行う場合は追加でインストール:
 #   pip install "cellpose[gui]"

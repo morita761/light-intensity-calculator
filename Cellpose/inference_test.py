@@ -26,8 +26,8 @@ import os
 import cv2
 import numpy as np
 from cellpose import io as cp_io
-from cellpose import models
 
+from func.cellpose_model import eval_image, load_model
 from func.cli_errors import run_main
 from func.vd_split import (
     green_center_x,
@@ -68,25 +68,10 @@ def run_cellpose(
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
     print(f"  shape={image.shape}, dtype={image.dtype}")
 
-    if pretrained_model:
-        print(f"[モデル準備] CellposeModel (pretrained_model='{pretrained_model}') ※fine-tuning済みモデル")
-        model = models.CellposeModel(gpu=use_gpu, pretrained_model=pretrained_model)
-    else:
-        print("[モデル準備] CellposeModel (pretrained_model='cpsam_v2') ※初回はモデルを自動ダウンロードします")
-        model = models.CellposeModel(gpu=use_gpu)
-
-    print(
-        f"[推論実行] diameter={diameter}, flow_threshold={flow_threshold}, "
-        f"cellprob_threshold={cellprob_threshold}"
+    model = load_model(use_gpu=use_gpu, pretrained_model=pretrained_model)
+    masks = eval_image(
+        model, image, diameter, flow_threshold=flow_threshold, cellprob_threshold=cellprob_threshold
     )
-    masks, flows, styles = model.eval(
-        image,
-        diameter=diameter,
-        flow_threshold=flow_threshold,
-        cellprob_threshold=cellprob_threshold,
-    )
-    n_instances = int(masks.max())
-    print(f"  検出インスタンス数: {n_instances}")
 
     return image, masks
 

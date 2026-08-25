@@ -56,16 +56,75 @@ Cellpose は Janelia/HHMI（Stringer, Pachitariu ら）が開発した、蛍光�
 
 ```
 Cellpose/
-├── inference_test.py            # 事前学習/fine-tuning済みモデルによる検出テスト
+├── inference_test.py            # 事前学習/fine-tuning済みモデルによる検出テスト（単一2D画像）
+├── inference_nd2_zstack.py      # ND2 Z-stack対応の改善版パイプライン（Z範囲ごとに独立検出）
 ├── estimate_diameter.py         # COCOアノテーションから推奨diameterを算出
 ├── dataset_prepare_from_coco.py # 既存のDetectron2用COCOアノテーションをCellpose形式に変換
 ├── train_finetune.py            # 変換したデータでcpsam_v2をCLIでfine-tuning（loss/TensorBoard記録付き）
 ├── launch_gui.py                # Cellpose GUI起動（human-in-the-loop fine-tuning用）
 ├── func/
-│   └── vd_split.py              # V-D（左右）分割・輝度計算（Detectron2/func/と同ロジック）
+│   ├── vd_split.py              # V-D（左右）分割・輝度計算（Detectron2/func/と同ロジック）
+│   ├── cellpose_model.py        # Cellposeモデルのロード・推論の共通処理
+│   ├── zstack.py                # ND2読込・Z範囲分割・投影(max/mean/sum)
+│   └── cli_errors.py            # CLIの日本語エラーメッセージ共通処理
 ├── results/                     # 検証結果の画像（本README用）
 └── requirements.txt
 ```
+
+## ND2 Z-stack対応版（`inference_nd2_zstack.py`）
+
+`inference_test.py` は1枚のZスライス（またはZ投影済みの2D画像）を前提としているのに対し、
+`inference_nd2_zstack.py` は顕微鏡の生データ（ND2形式、1画像あたりZ方向に約20枚のスライス）を
+直接入力とし、**Z方向のノイズや、異なるZ位置にある軸索が重なることによる誤検出を減らす**ことを
+目的とした改善版パイプライン。
+
+### 検出方式
+
+1つのND2ファイルに対し、Z-stackを複数のZ範囲に分けてそれぞれ重ね合わせ(投影)を作り、
+範囲ごとに**独立して**馬蹄形検出を行う（結果は統合しない）。
+
+1. **全Z-stackを重ねて検出**: Z1〜Z20のように、すべてのZスライスを重ねて1回検出する。
+2. **5枚ずつZ方向にずらして検出**: Z1〜Z5, Z4〜Z8, Z7〜Z11, ... のように、
+   `--window-size`枚（デフォルト5）を`--step`枚（デフォルト3）おきにずらしながら、
+   それぞれ独立して検出する。
+
+各Z範囲の結果は`<出力先>/<範囲名>/`以下に個別保存されるため、後から`summary.csv`と
+`comparison_montage.png`で見比べ、どのZ範囲で馬蹄形が最も適切に検出できているかを
+人手で評価できる（ノイズが少ない・軸索の重なりによる誤検出が少ない範囲を選ぶ用途）。
+
+### 使い方
+
+```bash
+pip install -r requirements.txt  # nd2パッケージを含む
+
+python inference_nd2_zstack.py --nd2 path/to/image.nd2
+
+# diameter・GPU・fine-tuning済みモデルの指定も inference_test.py と同様に可能
+python inference_nd2_zstack.py --nd2 path/to/image.nd2 --diameter 40 --gpu \
+    --pretrained-model ./output/models/horseshoe_cpsam
+
+# window-size/stepを変更する場合
+python inference_nd2_zstack.py --nd2 path/to/image.nd2 --window-size 5 --step 3
+
+# 全Z-stack投影による検出だけ省略したい場合
+python inference_nd2_zstack.py --nd2 path/to/image.nd2 --no-full-stack
+
+# Z方向の重ね合わせ方式（デフォルトは最大値投影）
+python inference_nd2_zstack.py --nd2 path/to/image.nd2 --projection mean
+```
+
+### 出力（`./output/zstack/<ND2ファイル名>/` 以下、デフォルト）
+
+| パス | 内容 |
+|---|---|
+| `<範囲名>/projection.png` | そのZ範囲を重ね合わせた投影画像 |
+| `<範囲名>/overlay.png` | 検出結果のオーバーレイ（V=シアン、D=マゼンタ） |
+| `<範囲名>/masks.tif` | インスタンスラベル画像（後で読み直し可能） |
+| `<範囲名>/instances.csv` | インスタンスごとの重心・面積・V/D・平均輝度 |
+| `summary.csv` | 全Z範囲の検出数・平均輝度の比較表 |
+| `comparison_montage.png` | 全Z範囲のoverlayを並べた比較用画像 |
+
+複数チャンネルのND2ファイルの場合は `--channel` でチャンネル番号を指定する（省略時は先頭チャンネル）。
 
 ## 環境構築
 
@@ -232,3 +291,8 @@ GUI内での操作手順（詳細は `launch_gui.py` のdocstringにも記載）
   組織テクスチャ由来の誤検出をどう除外するか（形状の凹み具合でのフィルタリング等）は未検証。
 - **fine-tuning後の`--flow-threshold`/`--cellprob-threshold`再チューニング**: これらの閾値の最適値は
   ゼロショット時と学習後で変わりうるため、fine-tuning後のモデルで改めて検証用データに対し調整が必要。
+- **Z範囲比較の定量評価**: `inference_nd2_zstack.py`は各Z範囲の検出結果を独立保存し
+  `summary.csv`/`comparison_montage.png`で見比べられるようにしたが、「どのZ範囲が最適か」の
+  自動判定（正解データとのIoU比較等）は未実装。現状は人手での目視評価が前提。
+- **実ND2データでの検証**: `inference_nd2_zstack.py`は合成データでのパイプライン動作確認のみ済み。
+  実際のND2ファイル・チャンネル構成での動作検証は未実施。

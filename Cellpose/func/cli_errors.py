@@ -26,3 +26,19 @@ def run_main(main_func):
     except KeyboardInterrupt:
         print("\n中断されました。", file=sys.stderr)
         sys.exit(130)
+
+
+def require_file(path, description):
+    """指定パスにファイルが存在しなければ、分かりやすい日本語メッセージで FileNotFoundError を送出する。"""
+    import os
+
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"{description}が見つかりません: {path}")
+
+
+def require_dir(path, description):
+    """指定パスにディレクトリが存在しなければ、分かりやすい日本語メッセージで NotADirectoryError を送出する。"""
+    import os
+
+    if not os.path.isdir(path):
+        raise NotADirectoryError(f"{description}が見つかりません: {path}")

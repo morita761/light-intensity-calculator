@@ -57,6 +57,7 @@ python Detectron2/inference_heatmaps.py
 | ファイル | 説明 |
 |---------|------|
 | `inference_test.py` | 事前学習モデル(cpsam_v2)によるゼロショット検出テスト（diameter/flow_threshold/cellprob_threshold指定可） |
+| `inference_nd2_zstack.py` | ND2 Z-stack対応の改善版パイプライン。Z範囲ごと（全Z-stack／5枚ずつずらした範囲）に独立して検出・比較 |
 | `estimate_diameter.py` | COCOアノテーションから推奨diameterを算出 |
 | `dataset_prepare_from_coco.py` | Detectron2用COCOアノテーションをCellpose形式に変換 |
 | `train_finetune.py` | 変換済みデータでのfine-tuning（loss履歴CSV・TensorBoardログ出力付き） |
