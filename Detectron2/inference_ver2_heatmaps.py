@@ -246,7 +246,7 @@ def main():
 
     # ここでクラス名を定義。モデルの学習時のクラス順序と一致させる必要があります。
     # 0:'background', 1:'horseshoe'
-    class_names = ["horseshoe", "negative_green_region"]
+    class_names = ["horseshoe", "negative"]
     MetadataCatalog.get("my_dataset_train").set(thing_classes=class_names)
 
     all_masks_left, all_masks_right, debug_images, image_cropped = process_images(
