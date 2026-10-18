@@ -1,0 +1,19 @@
+# 比較する系統の定義
+#
+# [セクション名] が --dataset で指定する名前になる。
+#   表示名 = data/raw/ 内の生データファイル名
+#
+# - 表示名はグラフの凡例・軸に使われる（記載順に並ぶ）
+# - parse_intensity.py を実行すると
+#   data/processed/<セクション名>/<ファイル名の拡張子なし>_v.csv / _d.csv が生成される
+# - ノーマライズの Grand Median はセクション内の全ファイルから計算されるため、
+#   同じ control.txt でもセクションごとに値が少し異なる
+
+[two_groups]
+Control = control.txt
+Cas9 = loco_vang_cas9.txt
+
+[three_groups]
+Control = control.txt
+vang RNAi = vang_rnai.txt
+vang Cas9 = loco_vang_cas9.txt

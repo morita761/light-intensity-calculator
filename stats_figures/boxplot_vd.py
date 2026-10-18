@@ -1,86 +1,42 @@
-import pandas as pd
+"""V-D分岐の箱ひげ図（Ventral R8s / Dorsal R8s を横並び）
+
+用途: 1系統（既定は control.txt）について、Ventral R8 と Dorsal R8 それぞれで
+      Ventral branch と Dorsal branch の輝度差を t検定付きの箱ひげ図で示す。
+      process_data.py（旧ノーマライズ方式）の出力を使う。
+入力: data/processed/single/v_normalize.csv, d_normalize.csv（process_data.py で生成）
+出力: output/boxplot_vd/boxplot_vd.png
+
+Usage:
+    python process_data.py      # 先にCSVを作る
+    python boxplot_vd.py
+    python boxplot_vd.py --both
+"""
 import matplotlib.pyplot as plt
-from scipy.stats import ttest_ind
 
-labels = ['Ventral', 'Dorsal']
+from lib.data_io import read_lr_csv
+from lib.figure import finish, make_parser, save_figure
+from lib.paths import PROCESSED_DIR
+from lib.plots import vd_boxplot
+from lib.settings import load_figure_settings
 
-# p値をアスタリスクに変換する関数
-def get_pvalue_asterisk(p):
-    if p < 0.00001:
-        return '*****'
-    elif p < 0.0001:
-        return '****'
-    elif p < 0.001:
-        return '***'
-    elif p < 0.01:
-        return '**'
-    elif p < 0.05:
-        return '*'
-    else:
-        return 'n.s.'
+NAME = 'boxplot_vd'
 
 
-# 1つの箱ひげ図を描く関数 ---------------------------------------------
-def plot_box(ax, df, title):
+def main():
+    args = make_parser(__doc__, NAME).parse_args()
+    s = load_figure_settings(NAME)
 
-    data = [df['left_intensity'], df['right_intensity']]
+    fig, axes = plt.subplots(1, 2, figsize=s.floats('figsize', (8, 4)))
+    for ax, sec, prefix in zip(axes, ('v', 'd'), ('ventral_', 'dorsal_')):
+        df = read_lr_csv(PROCESSED_DIR / 'single' / f'{sec}_normalize.csv')
+        _, p_val = vd_boxplot(ax, df, s)
+        s.apply(ax, prefix=prefix)
+        print(f"{s.str(prefix + 'title')}: p = {p_val:.2e}")
 
-    # 箱ひげ図
-    box = ax.boxplot(data, labels=['Ventral branch', 'Dorsal branch'], patch_artist=True, widths=0.6)
-
-    # boxスタイル
-    for i, patch in enumerate(box['boxes']):
-        patch.set_facecolor("white")
-        patch.set_edgecolor("black")
-        patch.set_linewidth(1.5)
-        if i == 0:  # 左
-            patch.set_hatch('///')
-
-    for part in ['whiskers', 'caps', 'medians']:
-        for element in box[part]:
-            element.set_color('black')
-            element.set_linewidth(1.5)
-
-    for flier in box['fliers']:
-        flier.set(marker='o', color='black', markersize=6)
-
-    # 軸
-    ax.set_ylabel("Intensity", fontsize=14)
-    ax.set_ylim(0, 100)
-    ax.tick_params(axis='both', labelsize=12)
-
-    # n 表示
-    for i, d in enumerate(data):
-        ax.text(i + 1, max(d) + 2, f'n={len(d)}', ha='center', fontsize=11)
-
-    # t検定
-    t_stat, p_val = ttest_ind(data[0], data[1])
-    asters = get_pvalue_asterisk(p_val)
-
-    # 線とアスタリスク
-    y_max = max(max(data[0]), max(data[1])) + 7
-    ax.plot([1, 1, 2, 2], [y_max, y_max + 2, y_max + 2, y_max],
-            lw=1.5, c='black')
-    ax.text(1.5, y_max + 1, asters, ha='center', fontsize=16)
-
-    # タイトル
-    ax.set_title(title, fontsize=15)
+    fig.tight_layout()
+    save_figure(fig, NAME, args, s, NAME)
+    finish(args)
 
 
-# ----------------------------------------------------------------------
-
-# CSVを2つ読み込み
-df_v = pd.read_csv("v_normalize.csv", delim_whitespace=True,
-                   names=["left_intensity", "right_intensity"], skiprows=1)
-
-df_d = pd.read_csv("d_normalize.csv", delim_whitespace=True,
-                   names=["left_intensity", "right_intensity"], skiprows=1)
-
-# subplotで横に並べる
-fig, axes = plt.subplots(1, 2, figsize=(8, 4))
-
-plot_box(axes[0], df_v, "Intensity in Ventral R8s")
-plot_box(axes[1], df_d, "Intensity in Dorsal R8s")
-
-plt.tight_layout()
-plt.show()
+if __name__ == '__main__':
+    main()

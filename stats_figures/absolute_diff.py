@@ -1,39 +1,52 @@
-import pandas as pd
-from scipy import stats
-import seaborn as sns
+"""V/Dをまとめた |L - R| の系統間比較（棒グラフ）
+
+用途: Ventral/Dorsal を区別せず、M1層全体として極性（|L - R|）が
+      系統間で弱まっているかを見る。棒は平均値、エラーバーは95%信頼区間。
+      先頭の系統との t検定の P値をコンソールに表示する。
+入力: data/processed/<dataset>/*_v.csv, *_d.csv
+出力: output/absolute_diff/absolute_diff_<dataset>.png
+
+Usage:
+    python absolute_diff.py
+    python absolute_diff.py --dataset three_groups --both
+"""
 import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy import stats
 
-# 1. 全データの読み込み
-cv = pd.read_csv('control_v.csv', sep=' ')
-cd = pd.read_csv('control_d.csv', sep=' ')
-kv = pd.read_csv('cas9_v.csv', sep=' ')
-kd = pd.read_csv('cas9_d.csv', sep=' ')
+from lib.data_io import abs_diff_long, load_vd
+from lib.figure import finish, make_parser, save_figure
+from lib.settings import load_figure_settings
 
-# 2. 各サンプルの絶対値差を計算
-c_all_diff = pd.concat([
-    (cv['left_intensity'] - cv['right_intensity']).abs(),
-    (cd['left_intensity'] - cd['right_intensity']).abs()
-])
-k_all_diff = pd.concat([
-    (kv['left_intensity'] - kv['right_intensity']).abs(),
-    (kd['left_intensity'] - kd['right_intensity']).abs()
-])
+NAME = 'absolute_diff'
 
-# 3. まとめた状態でt検定
-t_stat, p_val = stats.ttest_ind(c_all_diff, k_all_diff)
 
-print(f"Pooled T-test P-value: {p_val:.2e}")
-print(f"Control Mean: {c_all_diff.mean():.2f}, Cas9 Mean: {k_all_diff.mean():.2f}")
+def main():
+    args = make_parser(__doc__, NAME, dataset_default='two_groups').parse_args()
+    s = load_figure_settings(NAME)
 
-# 4. グラフ作成
-plot_data = pd.DataFrame({
-    'Genotype': ['Control'] * len(c_all_diff) + ['Cas9'] * len(k_all_diff),
-    'Polarity (Abs Diff)': pd.concat([c_all_diff, k_all_diff])
-})
+    data = load_vd(args.dataset)
+    order = list(data)
+    diff_all = abs_diff_long(data)
 
-plt.figure(figsize=(6, 6))
-sns.barplot(data=plot_data, x='Genotype', y='Polarity (Abs Diff)', capsize=.1, palette='Set2')
-plt.title(f'M1 Layer Overall: Polarity Attenuation\n(p = {p_val:.2e})')
-plt.ylabel('Mean Absolute Difference (|L - R|)')
-plt.savefig('pooled_comparison.png')
-plt.show()
+    # V/D をまとめた状態で、先頭の系統 vs 各系統の t検定
+    ref = order[0]
+    ref_data = diff_all[diff_all['genotype'] == ref]['abs_diff']
+    print(f"{ref} Mean: {ref_data.mean():.2f}")
+    for genotype in order[1:]:
+        other = diff_all[diff_all['genotype'] == genotype]['abs_diff']
+        _, p_val = stats.ttest_ind(ref_data, other)
+        print(f"{genotype} Mean: {other.mean():.2f}  (Pooled t-test vs {ref}: P = {p_val:.2e})")
+
+    fig, ax = plt.subplots(figsize=s.floats('figsize', (6, 6)))
+    sns.barplot(data=diff_all, x='genotype', y='abs_diff', order=order, hue='genotype',
+                capsize=.1, palette=s.str('palette', 'Set2'), legend=False, ax=ax)
+    s.apply(ax)
+
+    fig.tight_layout()
+    save_figure(fig, f'{NAME}_{args.dataset}', args, s, NAME)
+    finish(args)
+
+
+if __name__ == '__main__':
+    main()

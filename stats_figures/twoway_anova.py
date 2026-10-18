@@ -1,167 +1,67 @@
-import pandas as pd
+"""Two-way ANOVA: Experiment（系統）× Branch（Ventral/Dorsal branch）
+
+用途: 「KOで Ventral/Dorsal branch 間の輝度差が緩和されるか」を検定する詳細版。
+      各CSVの left_intensity = Ventral branch, right_intensity = Dorsal branch として、
+      記述統計 / 条件別 t検定 / 全体・Side別 ANOVA（効果量η²付き）/ Tukey HSD を
+      コンソールに出力し、図を4種類保存する。
+入力: data/processed/<dataset>/*_v.csv, *_d.csv
+出力: output/twoway_anova/twoway_anova_<dataset>_*.png
+        _interaction        交互作用プロット（全データ）
+        _boxplot_conditions 条件別箱ひげ図（t検定付き）
+        _branch_difference  branch差（V - D）の比較
+        _summary            Side別のまとめ（メイン結果）
+
+Usage:
+    python twoway_anova.py
+    python twoway_anova.py --dataset three_groups --both --no-show
+"""
+import matplotlib.pyplot as plt
 import numpy as np
-from scipy import stats
+import pandas as pd
 import statsmodels.api as sm
+from scipy import stats
 from statsmodels.formula.api import ols
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
-import matplotlib.pyplot as plt
-import seaborn as sns
 
-def load_and_prepare_data():
-    """
-    4つのCSVファイルを読み込み、Two-way ANOVA用のデータフレームを作成する。
+from lib.data_io import intensity_long, load_vd
+from lib.figure import finish, make_parser, save_figure
+from lib.settings import load_figure_settings
+from lib.stats_utils import p_to_asterisks
 
-    ファイル構造:
-    - control_v.csv, control_d.csv: Control群（Ventral side, Dorsal side）
-    - cas9_v.csv, cas9_d.csv: KO群（Ventral side, Dorsal side）
-
-    各ファイル内:
-    - left_intensity: Ventral branch の輝度
-    - right_intensity: Dorsal branch の輝度
-
-    Two-way ANOVAの要因:
-    - experiment: control / KO
-    - branch: Ventral / Dorsal
-    """
-    files = {
-        ('control', 'Ventral'): 'control_v.csv',
-        ('control', 'Dorsal'): 'control_d.csv',
-        ('KO', 'Ventral'): 'cas9_v.csv',
-        ('KO', 'Dorsal'): 'cas9_d.csv',
-    }
-
-    all_data = []
-
-    for (experiment, side), filename in files.items():
-        try:
-            df = pd.read_csv(filename, sep=r'\s+')
-
-            # left_intensity = Ventral branch
-            for val in df['left_intensity']:
-                all_data.append({
-                    'experiment': experiment,
-                    'side': side,
-                    'branch': 'Ventral',
-                    'intensity': val
-                })
-
-            # right_intensity = Dorsal branch
-            for val in df['right_intensity']:
-                all_data.append({
-                    'experiment': experiment,
-                    'side': side,
-                    'branch': 'Dorsal',
-                    'intensity': val
-                })
-
-        except FileNotFoundError:
-            print(f"エラー: ファイル '{filename}' が見つかりません。")
-            return None
-
-    return pd.DataFrame(all_data)
+NAME = 'twoway_anova'
+BRANCHES = ['Ventral', 'Dorsal']
+SIDES = ['Ventral', 'Dorsal']
 
 
-def get_significance(p):
-    """p値を有意性マークに変換"""
-    if p < 0.0001:
-        return '****'
-    elif p < 0.001:
-        return '***'
-    elif p < 0.01:
-        return '**'
-    elif p < 0.05:
-        return '*'
-    else:
-        return 'n.s.'
+def load_and_prepare_data(dataset):
+    """縦持ちデータ (experiment, side, branch, intensity) を作る"""
+    df = intensity_long(load_vd(dataset), BRANCHES)
+    return df.rename(columns={'genotype': 'experiment'})
 
 
-def run_twoway_anova_exp_branch(df):
-    """
-    Two-way ANOVA: Experiment × Branch
-
-    目的: KOによってVentral/Dorsal branch間の輝度差が緩和されるかを検定
-    """
+def print_descriptive_stats(df):
+    print("\n" + "=" * 70)
+    print("記述統計量")
     print("=" * 70)
-    print("Two-way ANOVA: Experiment (control/KO) × Branch (Ventral/Dorsal)")
-    print("=" * 70)
-    print("\n【仮説】")
-    print("  - Control群: Ventral branch と Dorsal branch で大きな輝度差がある")
-    print("  - KO群: その差が緩和される")
-    print("  → Experiment × Branch の交互作用が有意であることを期待")
-
-    model = ols('intensity ~ C(experiment) * C(branch)', data=df).fit()
-    anova_table = sm.stats.anova_lm(model, typ=2)
-
-    print("\n【ANOVA Table】")
-    print(anova_table)
-
-    # 効果量 (η²)
-    ss_total = anova_table['sum_sq'].sum()
-    anova_table['eta_sq'] = anova_table['sum_sq'] / ss_total
-
-    print("\n【Effect Size (η²)】")
-    for idx in anova_table.index[:-1]:
-        print(f"  {idx}: η² = {anova_table.loc[idx, 'eta_sq']:.4f}")
-
-    print("\n【有意性判定】")
-    for idx in anova_table.index[:-1]:
-        p_val = anova_table.loc[idx, 'PR(>F)']
-        sig = get_significance(p_val)
-        print(f"  {idx}: p = {p_val:.6f} {sig}")
-
-    return anova_table
+    grouped = df.groupby(['experiment', 'side', 'branch'], sort=False)['intensity']
+    print(grouped.agg(['count', 'mean', 'std', 'median']).round(3))
 
 
-def run_twoway_anova_by_side(df):
-    """
-    Side別 (Ventral side / Dorsal side) に Two-way ANOVA を実行
-    """
-    results = {}
-
-    for side in ['Ventral', 'Dorsal']:
-        print("\n" + "=" * 70)
-        print(f"Two-way ANOVA ({side} side のみ): Experiment × Branch")
-        print("=" * 70)
-
-        df_side = df[df['side'] == side].copy()
-
-        model = ols('intensity ~ C(experiment) * C(branch)', data=df_side).fit()
-        anova_table = sm.stats.anova_lm(model, typ=2)
-
-        print("\n【ANOVA Table】")
-        print(anova_table)
-
-        print("\n【有意性判定】")
-        for idx in anova_table.index[:-1]:
-            p_val = anova_table.loc[idx, 'PR(>F)']
-            sig = get_significance(p_val)
-            print(f"  {idx}: p = {p_val:.6f} {sig}")
-
-        results[side] = anova_table
-
-    return results
-
-
-def run_ttest_branch_comparison(df):
-    """
-    各条件でのVentral branch vs Dorsal branch のt検定
-    """
+def run_ttest_branch_comparison(df, experiments):
+    """各条件での Ventral branch vs Dorsal branch の t検定"""
     print("\n" + "=" * 70)
     print("t検定: Ventral branch vs Dorsal branch (各条件)")
     print("=" * 70)
 
     results = []
-
-    for experiment in ['control', 'KO']:
-        for side in ['Ventral', 'Dorsal']:
+    for experiment in experiments:
+        for side in SIDES:
             df_subset = df[(df['experiment'] == experiment) & (df['side'] == side)]
-
             ventral = df_subset[df_subset['branch'] == 'Ventral']['intensity']
             dorsal = df_subset[df_subset['branch'] == 'Dorsal']['intensity']
 
             t_stat, p_val = stats.ttest_ind(ventral, dorsal)
-            sig = get_significance(p_val)
-
+            sig = p_to_asterisks(p_val)
             diff = ventral.mean() - dorsal.mean()
 
             print(f"\n【{experiment} - {side} side】")
@@ -170,357 +70,229 @@ def run_ttest_branch_comparison(df):
             print(f"  差 (V - D): {diff:.2f}")
             print(f"  t = {t_stat:.4f}, p = {p_val:.6f} {sig}")
 
-            results.append({
-                'experiment': experiment,
-                'side': side,
-                'ventral_mean': ventral.mean(),
-                'dorsal_mean': dorsal.mean(),
-                'diff': diff,
-                't_stat': t_stat,
-                'p_val': p_val,
-                'sig': sig
-            })
-
+            results.append({'experiment': experiment, 'side': side,
+                            'ventral_mean': ventral.mean(), 'dorsal_mean': dorsal.mean(),
+                            'diff': diff, 't_stat': t_stat, 'p_val': p_val, 'sig': sig})
     return pd.DataFrame(results)
 
 
-def print_descriptive_stats(df):
-    """記述統計量を表示"""
-    print("\n" + "=" * 70)
-    print("記述統計量")
-    print("=" * 70)
+def run_anova(df, label):
+    model = ols('intensity ~ C(experiment) * C(branch)', data=df).fit()
+    anova_table = sm.stats.anova_lm(model, typ=2)
+    print(f"\n【ANOVA Table】{label}")
+    print(anova_table)
 
-    grouped = df.groupby(['experiment', 'side', 'branch'])['intensity']
-    stats_df = grouped.agg(['count', 'mean', 'std', 'median']).round(3)
-    print(stats_df)
+    anova_table['eta_sq'] = anova_table['sum_sq'] / anova_table['sum_sq'].sum()
+    print("\n【Effect Size (η²) / 有意性判定】")
+    for idx in anova_table.index[:-1]:
+        p_val = anova_table.loc[idx, 'PR(>F)']
+        print(f"  {idx}: η² = {anova_table.loc[idx, 'eta_sq']:.4f}, p = {p_val:.6f} {p_to_asterisks(p_val)}")
+    return anova_table
 
 
 def run_posthoc_tukey(df):
-    """Tukey HSD事後検定"""
     print("\n" + "=" * 70)
     print("事後検定 (Tukey HSD): Experiment × Branch")
     print("=" * 70)
-
-    df_copy = df.copy()
-    df_copy['group'] = df_copy['experiment'] + '_' + df_copy['branch']
-
-    tukey = pairwise_tukeyhsd(df_copy['intensity'], df_copy['group'], alpha=0.05)
+    groups = df['experiment'] + '_' + df['branch']
+    tukey = pairwise_tukeyhsd(df['intensity'], groups, alpha=0.05)
     print(tukey)
     return tukey
 
 
-def plot_interaction_exp_branch(df, anova_table):
-    """Experiment × Branch の交互作用プロット"""
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-
-    # 平均値と標準誤差を計算
-    summary = df.groupby(['experiment', 'branch'])['intensity'].agg(['mean', 'std', 'count'])
+def mean_se(df, keys):
+    summary = df.groupby(keys, sort=False)['intensity'].agg(['mean', 'std', 'count'])
     summary['se'] = summary['std'] / np.sqrt(summary['count'])
-    summary = summary.reset_index()
+    return summary.reset_index()
 
-    # --- 左図: Experiment を x 軸 ---
-    ax1 = axes[0]
-    colors = {'Ventral': '#1f77b4', 'Dorsal': '#ff7f0e'}
-    for branch in ['Ventral', 'Dorsal']:
-        data = summary[summary['branch'] == branch]
-        ax1.errorbar(
-            data['experiment'], data['mean'], yerr=data['se'],
-            marker='o', markersize=10, capsize=5, capthick=2, linewidth=2.5,
-            label=f'{branch} branch', color=colors[branch]
-        )
-    ax1.set_xlabel('Experiment', fontsize=14)
-    ax1.set_ylabel('Intensity (Mean ± SE)', fontsize=14)
-    ax1.set_title('Interaction Plot\n(X: Experiment, Lines: Branch)', fontsize=13)
-    ax1.legend(fontsize=12)
-    ax1.tick_params(labelsize=12)
 
-    # --- 右図: Branch を x 軸 ---
-    ax2 = axes[1]
-    colors_exp = {'control': '#2ca02c', 'KO': '#d62728'}
-    for experiment in ['control', 'KO']:
-        data = summary[summary['experiment'] == experiment]
-        ax2.errorbar(
-            data['branch'], data['mean'], yerr=data['se'],
-            marker='o', markersize=10, capsize=5, capthick=2, linewidth=2.5,
-            label=experiment, color=colors_exp[experiment]
-        )
-    ax2.set_xlabel('Branch', fontsize=14)
-    ax2.set_ylabel('Intensity (Mean ± SE)', fontsize=14)
-    ax2.set_title('Interaction Plot\n(X: Branch, Lines: Experiment)', fontsize=13)
-    ax2.legend(fontsize=12)
-    ax2.tick_params(labelsize=12)
+def errorbar_lines(ax, summary, x, line, line_values, colors, label_fmt='{}'):
+    for value in line_values:
+        data = summary[summary[line] == value]
+        ax.errorbar(data[x], data['mean'], yerr=data['se'],
+                    marker='o', markersize=10, capsize=5, capthick=2, linewidth=2.5,
+                    label=label_fmt.format(value), color=colors[value])
 
-    # ANOVA結果
+
+def plot_interaction_exp_branch(df, anova_table, experiments, colors, s, args, tag):
+    """Experiment × Branch の交互作用プロット（全データ）"""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=s.floats('interaction_figsize', (12, 5)))
+    summary = mean_se(df, ['experiment', 'branch'])
+
+    errorbar_lines(ax1, summary, 'experiment', 'branch', BRANCHES, colors['branch'], '{} branch')
+    s.apply(ax1, prefix='interaction_left_')
+    ax1.legend(fontsize=s.float('legend_fontsize'))
+
+    errorbar_lines(ax2, summary, 'branch', 'experiment', experiments, colors['experiment'])
+    s.apply(ax2, prefix='interaction_right_')
+    ax2.legend(fontsize=s.float('legend_fontsize'))
+
     p_interaction = anova_table.loc['C(experiment):C(branch)', 'PR(>F)']
-    sig = get_significance(p_interaction)
-    fig.suptitle(f'Two-way ANOVA: Experiment × Branch\nInteraction p = {p_interaction:.2e} {sig}',
-                 fontsize=14, y=1.05)
-
-    plt.tight_layout()
-    plt.savefig('twoway_anova_interaction.png', dpi=150, bbox_inches='tight')
-    print("\n交互作用プロットを 'twoway_anova_interaction.png' に保存しました。")
-    plt.show()
+    fig.suptitle(f"{s.str('interaction_suptitle')}\nInteraction p = {p_interaction:.2e} "
+                 f"{p_to_asterisks(p_interaction)}", fontsize=14, y=1.05)
+    fig.tight_layout()
+    save_figure(fig, f'{tag}_interaction', args, s, NAME)
 
 
-def plot_boxplot_by_condition(df, ttest_results):
+def plot_boxplot_by_condition(df, ttest_results, experiments, colors, s, args, tag):
     """条件別の箱ひげ図（t検定結果付き）"""
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    n_rows = len(experiments)
+    fig, axes = plt.subplots(n_rows, 2, figsize=s.floats('conditions_figsize', (12, 5 * n_rows)),
+                             squeeze=False)
 
-    conditions = [
-        ('control', 'Ventral', axes[0, 0]),
-        ('control', 'Dorsal', axes[0, 1]),
-        ('KO', 'Ventral', axes[1, 0]),
-        ('KO', 'Dorsal', axes[1, 1]),
-    ]
-
-    for experiment, side, ax in conditions:
-        df_subset = df[(df['experiment'] == experiment) & (df['side'] == side)]
-
-        # 箱ひげ図
-        data_v = df_subset[df_subset['branch'] == 'Ventral']['intensity']
-        data_d = df_subset[df_subset['branch'] == 'Dorsal']['intensity']
-
-        box = ax.boxplot([data_v, data_d], tick_labels=['Ventral\nbranch', 'Dorsal\nbranch'],
-                         patch_artist=True, widths=0.6)
-
-        # スタイル
-        colors_box = ['#1f77b4', '#ff7f0e']
-        for i, patch in enumerate(box['boxes']):
-            patch.set_facecolor(colors_box[i])
-            patch.set_alpha(0.7)
-
-        # n数
-        ax.text(1, data_v.max() + 2, f'n={len(data_v)}', ha='center', fontsize=11)
-        ax.text(2, data_d.max() + 2, f'n={len(data_d)}', ha='center', fontsize=11)
-
-        # t検定結果
-        result = ttest_results[(ttest_results['experiment'] == experiment) &
-                               (ttest_results['side'] == side)].iloc[0]
-        sig = result['sig']
-
-        # 有意差線
-        y_max = max(data_v.max(), data_d.max()) + 5
-        ax.plot([1, 1, 2, 2], [y_max, y_max + 2, y_max + 2, y_max], lw=1.5, c='black')
-        ax.text(1.5, y_max + 2, sig, ha='center', fontsize=16, fontweight='bold')
-
-        ax.set_ylabel('Intensity', fontsize=12)
-        ax.set_title(f'{experiment} - {side} side\n(p = {result["p_val"]:.2e})', fontsize=13)
-        ax.set_ylim(0, y_max + 15)
-        ax.tick_params(labelsize=11)
-
-    plt.suptitle('Ventral branch vs Dorsal branch (by condition)', fontsize=15, fontweight='bold')
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
-    plt.savefig('twoway_anova_boxplot_conditions.png', dpi=150, bbox_inches='tight')
-    print("条件別箱ひげ図を 'twoway_anova_boxplot_conditions.png' に保存しました。")
-    plt.show()
-
-
-def plot_branch_difference(df, ttest_results):
-    """Branch間の差（Ventral - Dorsal）を比較するプロット"""
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    # 各条件でのbranch間差を計算
-    diff_data = []
-    for experiment in ['control', 'KO']:
-        for side in ['Ventral', 'Dorsal']:
+    for row, experiment in enumerate(experiments):
+        for col, side in enumerate(SIDES):
+            ax = axes[row, col]
             df_subset = df[(df['experiment'] == experiment) & (df['side'] == side)]
+            data_v = df_subset[df_subset['branch'] == 'Ventral']['intensity']
+            data_d = df_subset[df_subset['branch'] == 'Dorsal']['intensity']
 
-            # 各サンプルペアの差を計算（同じインデックス同士）
+            box = ax.boxplot([data_v, data_d], tick_labels=['Ventral\nbranch', 'Dorsal\nbranch'],
+                             patch_artist=True, widths=0.6)
+            for i, patch in enumerate(box['boxes']):
+                patch.set_facecolor(colors['branch'][BRANCHES[i]])
+                patch.set_alpha(0.7)
+
+            ax.text(1, data_v.max() + 2, f'n={len(data_v)}', ha='center', fontsize=11)
+            ax.text(2, data_d.max() + 2, f'n={len(data_d)}', ha='center', fontsize=11)
+
+            result = ttest_results[(ttest_results['experiment'] == experiment) &
+                                   (ttest_results['side'] == side)].iloc[0]
+            y_max = max(data_v.max(), data_d.max()) + 5
+            ax.plot([1, 1, 2, 2], [y_max, y_max + 2, y_max + 2, y_max], lw=1.5, c='black')
+            ax.text(1.5, y_max + 2, result['sig'], ha='center', fontsize=16, fontweight='bold')
+
+            s.apply(ax, prefix='conditions_')
+            ax.set_title(f'{experiment} - {side} side\n(p = {result["p_val"]:.2e})',
+                         fontsize=s.float('title_fontsize'))
+            if s.ylim('conditions_ylim') is None:
+                ax.set_ylim(0, y_max + 15)
+
+    fig.suptitle(s.str('conditions_suptitle'), fontsize=15, fontweight='bold')
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    save_figure(fig, f'{tag}_boxplot_conditions', args, s, NAME)
+
+
+def plot_branch_difference(df, experiments, colors, s, args, tag):
+    """Branch間の差（Ventral - Dorsal）を条件ごとに比較"""
+    fig, ax = plt.subplots(figsize=s.floats('branch_difference_figsize', (10, 6)))
+
+    groups, diffs, box_colors = [], [], []
+    for experiment in experiments:
+        for side in SIDES:
+            df_subset = df[(df['experiment'] == experiment) & (df['side'] == side)]
             ventral = df_subset[df_subset['branch'] == 'Ventral']['intensity'].values
             dorsal = df_subset[df_subset['branch'] == 'Dorsal']['intensity'].values
-
-            # サンプル数が同じ場合、ペアごとの差を計算
+            # 同じ行（同じ細胞）同士の差
             min_len = min(len(ventral), len(dorsal))
-            differences = ventral[:min_len] - dorsal[:min_len]
+            groups.append(f'{experiment}\n{side} side')
+            diffs.append(ventral[:min_len] - dorsal[:min_len])
+            box_colors.append(colors['experiment'][experiment])
 
-            for d in differences:
-                diff_data.append({
-                    'experiment': experiment,
-                    'side': side,
-                    'diff': d
-                })
-
-    df_diff = pd.DataFrame(diff_data)
-    df_diff['group'] = df_diff['experiment'] + '\n' + df_diff['side'] + ' side'
-
-    # 箱ひげ図
-    order = ['control\nVentral side', 'control\nDorsal side', 'KO\nVentral side', 'KO\nDorsal side']
-    colors = ['#2ca02c', '#2ca02c', '#d62728', '#d62728']
-
-    box = ax.boxplot([df_diff[df_diff['group'] == g]['diff'] for g in order],
-                     tick_labels=order, patch_artist=True, widths=0.6)
-
-    for i, patch in enumerate(box['boxes']):
-        patch.set_facecolor(colors[i])
+    box = ax.boxplot(diffs, tick_labels=groups, patch_artist=True, widths=0.6)
+    for patch, color in zip(box['boxes'], box_colors):
+        patch.set_facecolor(color)
         patch.set_alpha(0.7)
 
     ax.axhline(y=0, color='black', linestyle='--', linewidth=1)
-    ax.set_ylabel('Intensity Difference\n(Ventral branch - Dorsal branch)', fontsize=13)
-    ax.set_title('Branch Difference by Experiment and Side\n(Positive = Ventral > Dorsal)', fontsize=14)
-    ax.tick_params(labelsize=11)
+    s.apply(ax, prefix='branch_difference_')
 
-    # 平均値を表示
-    for i, g in enumerate(order):
-        mean_val = df_diff[df_diff['group'] == g]['diff'].mean()
-        ax.text(i + 1, ax.get_ylim()[1] * 0.9, f'mean={mean_val:.1f}', ha='center', fontsize=10)
+    for i, d in enumerate(diffs):
+        ax.text(i + 1, ax.get_ylim()[1] * 0.9, f'mean={d.mean():.1f}', ha='center', fontsize=10)
 
-    plt.tight_layout()
-    plt.savefig('twoway_anova_branch_difference.png', dpi=150, bbox_inches='tight')
-    print("Branch差の比較図を 'twoway_anova_branch_difference.png' に保存しました。")
-    plt.show()
+    fig.tight_layout()
+    save_figure(fig, f'{tag}_branch_difference', args, s, NAME)
 
 
-def plot_summary_by_side(df, anova_by_side, ttest_results):
+def plot_summary_by_side(df, anova_by_side, ttest_results, experiments, colors, s, args, tag):
     """Side別のサマリー図（メイン結果）"""
-    fig = plt.figure(figsize=(14, 10))
+    fig = plt.figure(figsize=s.floats('summary_figsize', (14, 10)))
 
-    colors = {'Ventral': '#1f77b4', 'Dorsal': '#ff7f0e'}
-    colors_exp = {'control': '#2ca02c', 'KO': '#d62728'}
+    # 上段: Side別の交互作用プロット
+    p_int = {}
+    for i, side in enumerate(SIDES, start=1):
+        ax = fig.add_subplot(2, 2, i)
+        summary = mean_se(df[df['side'] == side], ['experiment', 'branch'])
+        errorbar_lines(ax, summary, 'experiment', 'branch', BRANCHES, colors['branch'], '{} branch')
+        p_int[side] = anova_by_side[side].loc['C(experiment):C(branch)', 'PR(>F)']
+        s.apply(ax, prefix='summary_interaction_')
+        ax.set_title(f'{side} side\nInteraction: p = {p_int[side]:.2e} {p_to_asterisks(p_int[side])}',
+                     fontsize=s.float('title_fontsize'))
+        ax.legend(fontsize=s.float('legend_fontsize'))
 
-    # --- 1. Ventral side 交互作用プロット (左上) ---
-    ax1 = fig.add_subplot(2, 2, 1)
-    df_v = df[df['side'] == 'Ventral']
-    summary_v = df_v.groupby(['experiment', 'branch'])['intensity'].agg(['mean', 'std', 'count'])
-    summary_v['se'] = summary_v['std'] / np.sqrt(summary_v['count'])
-    summary_v = summary_v.reset_index()
-
-    for branch in ['Ventral', 'Dorsal']:
-        data = summary_v[summary_v['branch'] == branch]
-        ax1.errorbar(
-            data['experiment'], data['mean'], yerr=data['se'],
-            marker='o', markersize=10, capsize=5, capthick=2, linewidth=2.5,
-            label=f'{branch} branch', color=colors[branch]
-        )
-
-    p_int_v = anova_by_side['Ventral'].loc['C(experiment):C(branch)', 'PR(>F)']
-    ax1.set_xlabel('Experiment', fontsize=12)
-    ax1.set_ylabel('Intensity (Mean ± SE)', fontsize=12)
-    ax1.set_title(f'Ventral side\nInteraction: p = {p_int_v:.2e} {get_significance(p_int_v)}', fontsize=13)
-    ax1.legend(fontsize=10)
-    ax1.tick_params(labelsize=10)
-
-    # --- 2. Dorsal side 交互作用プロット (右上) ---
-    ax2 = fig.add_subplot(2, 2, 2)
-    df_d = df[df['side'] == 'Dorsal']
-    summary_d = df_d.groupby(['experiment', 'branch'])['intensity'].agg(['mean', 'std', 'count'])
-    summary_d['se'] = summary_d['std'] / np.sqrt(summary_d['count'])
-    summary_d = summary_d.reset_index()
-
-    for branch in ['Ventral', 'Dorsal']:
-        data = summary_d[summary_d['branch'] == branch]
-        ax2.errorbar(
-            data['experiment'], data['mean'], yerr=data['se'],
-            marker='o', markersize=10, capsize=5, capthick=2, linewidth=2.5,
-            label=f'{branch} branch', color=colors[branch]
-        )
-
-    p_int_d = anova_by_side['Dorsal'].loc['C(experiment):C(branch)', 'PR(>F)']
-    ax2.set_xlabel('Experiment', fontsize=12)
-    ax2.set_ylabel('Intensity (Mean ± SE)', fontsize=12)
-    ax2.set_title(f'Dorsal side\nInteraction: p = {p_int_d:.2e} {get_significance(p_int_d)}', fontsize=13)
-    ax2.legend(fontsize=10)
-    ax2.tick_params(labelsize=10)
-
-    # --- 3. Branch差の棒グラフ (左下) ---
+    # 左下: Branch差の棒グラフ
     ax3 = fig.add_subplot(2, 2, 3)
-
-    x_labels = []
-    diffs = []
-    sigs = []
-    colors_bar = []
-
-    for _, row in ttest_results.iterrows():
-        x_labels.append(f"{row['experiment']}\n{row['side']}")
-        diffs.append(abs(row['diff']))  # 絶対値で表示
-        sigs.append(row['sig'])
-        colors_bar.append(colors_exp[row['experiment']])
-
-    bars = ax3.bar(x_labels, diffs, color=colors_bar, alpha=0.7, edgecolor='black')
-
-    for i, (bar, sig) in enumerate(zip(bars, sigs)):
-        ax3.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.3,
+    x_labels = [f"{r['experiment']}\n{r['side']}" for _, r in ttest_results.iterrows()]
+    bars = ax3.bar(x_labels, ttest_results['diff'].abs(),
+                   color=[colors['experiment'][e] for e in ttest_results['experiment']],
+                   alpha=0.7, edgecolor='black')
+    for bar, sig in zip(bars, ttest_results['sig']):
+        ax3.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.3,
                  sig, ha='center', fontsize=14, fontweight='bold')
+    s.apply(ax3, prefix='summary_bar_')
 
-    ax3.set_ylabel('|V - D| branch difference', fontsize=12)
-    ax3.set_title('Branch Intensity Difference (absolute)\nwith t-test significance', fontsize=13)
-    ax3.tick_params(labelsize=10)
-
-    # --- 4. 結果サマリー (右下) ---
+    # 右下: 結果サマリー（テキスト）
     ax4 = fig.add_subplot(2, 2, 4)
     ax4.axis('off')
-
-    summary_text = "Two-way ANOVA Results (by side)\n"
-    summary_text += "=" * 45 + "\n\n"
-
-    summary_text += "Ventral side (Experiment x Branch):\n"
-    summary_text += f"  Interaction: p = {p_int_v:.2e} {get_significance(p_int_v)}\n\n"
-
-    summary_text += "Dorsal side (Experiment x Branch):\n"
-    summary_text += f"  Interaction: p = {p_int_d:.2e} {get_significance(p_int_d)}\n\n"
-
-    summary_text += "=" * 45 + "\n"
-    summary_text += "t-test: V branch vs D branch\n"
-    summary_text += "-" * 45 + "\n"
-
+    lines = ["Two-way ANOVA Results (by side)", "=" * 45, ""]
+    for side in SIDES:
+        lines += [f"{side} side (Experiment x Branch):",
+                  f"  Interaction: p = {p_int[side]:.2e} {p_to_asterisks(p_int[side])}", ""]
+    lines += ["=" * 45, "t-test: V branch vs D branch", "-" * 45]
     for _, row in ttest_results.iterrows():
-        summary_text += f"{row['experiment']:8} {row['side']:8}: "
-        summary_text += f"diff={row['diff']:+.1f}, p={row['p_val']:.1e} {row['sig']}\n"
-
-    summary_text += "\n" + "=" * 45 + "\n"
-    summary_text += "Conclusion:\n"
-    summary_text += "KO reduces V-D branch intensity difference\n"
-    summary_text += f"(control: ****, KO: **~***)"
-
-    ax4.text(0.05, 0.95, summary_text, fontsize=11, family='monospace',
+        lines.append(f"{row['experiment']:8} {row['side']:8}: "
+                     f"diff={row['diff']:+.1f}, p={row['p_val']:.1e} {row['sig']}")
+    conclusion = s.str('summary_conclusion')
+    if conclusion:
+        lines += ["", "=" * 45, "Conclusion:", conclusion]
+    ax4.text(0.05, 0.95, '\n'.join(lines), fontsize=11, family='monospace',
              transform=ax4.transAxes, verticalalignment='top')
 
-    plt.suptitle('Two-way ANOVA: Effect of KO on Branch Intensity Difference',
-                 fontsize=16, fontweight='bold')
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
-    plt.savefig('twoway_anova_summary.png', dpi=150, bbox_inches='tight')
-    print("\nサマリー図を 'twoway_anova_summary.png' に保存しました。")
-    plt.show()
+    fig.suptitle(s.str('summary_suptitle'), fontsize=16, fontweight='bold')
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    save_figure(fig, f'{tag}_summary', args, s, NAME)
 
 
-# --- メイン実行部分 ---
-if __name__ == '__main__':
-    # データの読み込み
-    df = load_and_prepare_data()
+def main():
+    args = make_parser(__doc__, NAME, dataset_default='two_groups').parse_args()
+    s = load_figure_settings(NAME)
 
-    if df is None:
-        print("データの読み込みに失敗しました。")
-        exit(1)
-
+    df = load_and_prepare_data(args.dataset)
+    experiments = list(df['experiment'].unique())
+    group_colors = s.list('group_colors', ['#2ca02c', '#d62728', '#9467bd', '#8c564b'])
+    colors = {
+        'branch': dict(zip(BRANCHES, s.list('branch_colors', ['#1f77b4', '#ff7f0e']))),
+        'experiment': dict(zip(experiments, group_colors)),
+    }
     print(f"総データ数: {len(df)}")
 
-    # 記述統計量
     print_descriptive_stats(df)
+    ttest_results = run_ttest_branch_comparison(df, experiments)
 
-    # t検定: 各条件でのVentral vs Dorsal branch
-    ttest_results = run_ttest_branch_comparison(df)
+    print("\n" + "=" * 70)
+    print(f"Two-way ANOVA: Experiment ({'/'.join(experiments)}) × Branch (Ventral/Dorsal)")
+    print("=" * 70)
+    anova_table = run_anova(df, '(全データ)')
 
-    # Two-way ANOVA: Experiment × Branch（全データ）
-    anova_table = run_twoway_anova_exp_branch(df)
+    anova_by_side = {}
+    for side in SIDES:
+        print("\n" + "=" * 70)
+        print(f"Two-way ANOVA ({side} side のみ): Experiment × Branch")
+        print("=" * 70)
+        anova_by_side[side] = run_anova(df[df['side'] == side], f'({side} side)')
 
-    # Side別のTwo-way ANOVA（メイン解析）
-    anova_by_side = run_twoway_anova_by_side(df)
+    run_posthoc_tukey(df)
 
-    # 事後検定
-    tukey = run_posthoc_tukey(df)
-
-    # --- 図の生成 ---
     print("\n" + "=" * 70)
     print("図の生成")
     print("=" * 70)
+    tag = f'{NAME}_{args.dataset}'
+    plot_interaction_exp_branch(df, anova_table, experiments, colors, s, args, tag)
+    plot_boxplot_by_condition(df, ttest_results, experiments, colors, s, args, tag)
+    plot_branch_difference(df, experiments, colors, s, args, tag)
+    plot_summary_by_side(df, anova_by_side, ttest_results, experiments, colors, s, args, tag)
+    finish(args)
 
-    # 交互作用プロット（全体）
-    plot_interaction_exp_branch(df, anova_table)
 
-    # 条件別箱ひげ図
-    plot_boxplot_by_condition(df, ttest_results)
-
-    # Branch差の比較
-    plot_branch_difference(df, ttest_results)
-
-    # サマリー図（Side別、メイン結果）
-    plot_summary_by_side(df, anova_by_side, ttest_results)
+if __name__ == '__main__':
+    main()

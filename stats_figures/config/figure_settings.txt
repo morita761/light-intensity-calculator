@@ -1,0 +1,192 @@
+# ==========================================================================
+# 図の設定（タイトル・軸ラベル・軸範囲・サイズ・色など）
+#
+# [セクション名] = スクリプト名。[common] は全スクリプト共通の既定値で、
+# 各セクションに同じキーを書くと上書きされる。
+#
+# 書式:
+#   文字列     title = Intensity            （\n で改行）
+#   数値       title_fontsize = 14
+#   組         figsize = 10, 7               （幅, 高さ インチ）
+#   軸範囲     ylim = 0, 100   /   ylim = auto（データに合わせて自動）
+#   リスト     branch_labels = Ventral branch, Dorsal branch
+#   キーを空にする（title = ）と、その文字は表示しない
+#
+# 複数パネルの図では「接頭辞_キー」で個別に指定できる
+#   （例: ventral_title, dorsal_title）。接頭辞付きがなければ接頭辞なしのキーを使う。
+#
+# 文字無し版は --no-text / --both で出力（ここの設定は変えなくてよい）
+# ==========================================================================
+
+[common]
+dpi = 300
+# png / pdf / svg / tiff など
+format = png
+title_fontsize = 14
+label_fontsize = 14
+tick_fontsize = 12
+legend_fontsize = 11
+# CSVの left_intensity / right_intensity の表示名
+branch_labels = Ventral branch, Dorsal branch
+
+
+# --------------------------------------------------------------------------
+# violin_plot.py : |L - R| の split violin plot
+# --------------------------------------------------------------------------
+[violin_plot]
+# figsize を消すと系統数に合わせて自動（4 + 3 × 系統数, 7）
+figsize = 10, 7
+title = Polarity Magnitude (|L - R|) Comparison\nSplit Violin Plot (Ventral vs Dorsal)
+xlabel = Genotype
+ylabel = Absolute Intensity Difference
+legend_title = side
+ylim = auto
+palette = Set2
+median_color = red
+median_linewidth = 2.5
+star_fontsize = 16
+# ブラケットの位置: データ最大値 + bracket_offset、比較ごとに bracket_step ずつ上へ
+bracket_offset = 8
+bracket_step = 10
+bracket_height = 1
+# ylim = auto の時、一番上のブラケットからの余白
+top_margin = 8
+
+
+# --------------------------------------------------------------------------
+# absolute_diff.py : V/Dまとめた |L - R| の棒グラフ
+# --------------------------------------------------------------------------
+[absolute_diff]
+figsize = 6, 6
+title = M1 Layer Overall: Polarity Attenuation
+xlabel = Genotype
+ylabel = Mean Absolute Difference (|L - R|)
+ylim = auto
+palette = Set2
+
+
+# --------------------------------------------------------------------------
+# dot_interaction_absolute.py : 左=輝度のドット+平均 / 右=|L - R| 棒グラフ
+# --------------------------------------------------------------------------
+[dot_interaction_absolute]
+figsize = 14, 6
+palette = Set2
+legend_title = Genotype
+left_title = Interaction Plot (Pooled)\nIndividual points + Mean
+left_xlabel = Branch
+left_ylabel = Intensity
+left_ylim = auto
+right_title = Polarity Magnitude (|L - R|)
+right_xlabel = Genotype
+right_ylabel = Absolute Intensity Difference
+right_ylim = auto
+
+
+# --------------------------------------------------------------------------
+# boxplot_vd.py : V-D分岐の箱ひげ図（2つ横並び）
+# --------------------------------------------------------------------------
+[boxplot_vd]
+figsize = 8, 4
+ylabel = Intensity
+ylim = 0, 100
+ventral_title = Intensity in Ventral R8s
+dorsal_title = Intensity in Dorsal R8s
+title_fontsize = 15
+n_fontsize = 11
+star_fontsize = 16
+max_stars = 5
+bracket_offset = 7
+bracket_height = 2
+
+
+# --------------------------------------------------------------------------
+# outputfig.py : 系統×V/D ごとの箱ひげ図（1枚ずつ）
+# --------------------------------------------------------------------------
+[outputfig]
+figsize = 6, 5
+ylabel = Normalized Fluorescence Intensity
+ylim = 0, 100
+label_fontsize = 16
+tick_fontsize = 14
+# 図の下中央に表示するキャプション
+ventral_caption = Intensity in Ventral R8s
+dorsal_caption = Intensity in Dorsal R8s
+caption_fontsize = 17
+n_fontsize = 13
+star_fontsize = 18
+max_stars = 5
+bracket_offset = 8
+bracket_height = 2
+
+
+# --------------------------------------------------------------------------
+# twoway_anova.py : Experiment × Branch の Two-way ANOVA
+# --------------------------------------------------------------------------
+[twoway_anova]
+branch_colors = #1f77b4, #ff7f0e
+# datasets.txt の記載順に割り当て
+group_colors = #2ca02c, #d62728, #9467bd, #8c564b
+
+# 交互作用プロット（全データ）
+interaction_figsize = 12, 5
+interaction_suptitle = Two-way ANOVA: Experiment × Branch
+interaction_left_title = Interaction Plot\n(X: Experiment, Lines: Branch)
+interaction_left_xlabel = Experiment
+interaction_left_ylabel = Intensity (Mean ± SE)
+interaction_right_title = Interaction Plot\n(X: Branch, Lines: Experiment)
+interaction_right_xlabel = Branch
+interaction_right_ylabel = Intensity (Mean ± SE)
+
+# 条件別箱ひげ図（タイトルは自動で「系統 - side (p値)」）
+conditions_suptitle = Ventral branch vs Dorsal branch (by condition)
+conditions_ylabel = Intensity
+conditions_ylim = auto
+
+# Branch差の比較
+branch_difference_figsize = 10, 6
+branch_difference_title = Branch Difference by Experiment and Side\n(Positive = Ventral > Dorsal)
+branch_difference_ylabel = Intensity Difference\n(Ventral branch - Dorsal branch)
+
+# サマリー図
+summary_figsize = 14, 10
+summary_suptitle = Two-way ANOVA: Effect of KO on Branch Intensity Difference
+summary_interaction_xlabel = Experiment
+summary_interaction_ylabel = Intensity (Mean ± SE)
+summary_bar_title = Branch Intensity Difference (absolute)\nwith t-test significance
+summary_bar_ylabel = |V - D| branch difference
+# 右下のテキストに追記する結論（空なら表示しない）
+summary_conclusion = KO reduces V-D branch intensity difference
+
+
+# --------------------------------------------------------------------------
+# twoway_anova_genotype_x_branch.py : Side別 Two-way ANOVA + Tukey
+# --------------------------------------------------------------------------
+[twoway_anova_genotype_x_branch]
+figsize = 14, 5
+legend_title = Genotype
+anova_table_title = Two-way ANOVA Results
+tukey_table_title = Tukey HSD 多重比較結果
+
+interaction_ventral_title = Interaction Plot: Ventral Side
+interaction_dorsal_title = Interaction Plot: Dorsal Side
+interaction_xlabel = Branch
+interaction_ylabel = GFP Intensity
+interaction_ylim = auto
+
+boxplot_ventral_title = Boxplot: Ventral Side
+boxplot_dorsal_title = Boxplot: Dorsal Side
+boxplot_xlabel = Genotype
+boxplot_ylabel = GFP Intensity
+boxplot_ylim = auto
+
+
+# --------------------------------------------------------------------------
+# linefig.py : 最小〜最大の縦線 + 平均
+# --------------------------------------------------------------------------
+[linefig]
+figsize = 8, 6
+xlabel =
+ylabel = Intensity
+ylim = 0, 1.2
+colors = red, blue, green
+n_offset = 0.05
