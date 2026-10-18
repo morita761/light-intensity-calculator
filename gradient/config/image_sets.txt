@@ -1,0 +1,26 @@
+# ==========================================================================
+# 画像セットの定義（gradient/）
+#
+# 書式は heatmap/config/image_sets.txt と同じ。1行に「元画像 | マスク」:
+#   元画像 : 輝度測定用（緑チャネルを使う）
+#   マスク : 測りたい範囲に色付きの長方形を描いた画像（色は --colors で指定）
+# 元画像とマスクが同じファイルでもよい（長方形の枠の内側を測る）。
+#
+# 画像は gradient/pics/ に置く（git管理外）。サンプルは data/sample/。
+# ==========================================================================
+
+[common]
+image_root = pics
+
+[control]
+label = Control
+dir = control
+images =
+    Projections of 20250413_24%APF_Fz2-GFP_fz2-RNAi_001_ue_green.png | Projections of 20250413_24%APF_Fz2-GFP_fz2-RNAi_001_ue_green-1.png
+
+# python make_dummy_gradient.py で作るサンプル（元画像 = マスク）
+[dummy]
+label = Dummy
+dir = ../data/sample
+images =
+    dummy_multi_gradient_image.png | dummy_multi_gradient_image.png

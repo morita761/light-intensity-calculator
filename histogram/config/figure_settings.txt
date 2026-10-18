@@ -1,0 +1,20 @@
+# 図と処理の設定（histogram/）。書式は stats_figures/config/figure_settings.txt と同じ。
+
+[common]
+dpi = 300
+format = png
+title_fontsize = 12
+label_fontsize = 12
+tick_fontsize = 10
+
+[clahe_histogram]
+# data/ 内の既定の入力画像（--image で上書き可）
+image = up_Fz_green_stronger.tif
+# CLAHE のパラメータ（--clip-limit / --tile で上書き可）
+clip_limit = 2.0
+tile = 8
+figsize = 12, 7.5
+original_title = Original (grayscale)
+clahe_title = After CLAHE
+hist_xlabel = Brightness
+hist_ylabel = Count

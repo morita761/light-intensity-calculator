@@ -1,0 +1,62 @@
+# ==========================================================================
+# 画像セットの定義（heatmap/ の全スクリプト共通）
+#
+# [セット名] が --set / --groups で指定する名前になる。
+#   label  : グラフに表示する名前
+#   dir    : image_root からのフォルダ
+#   images : 1行に1組。列は「 | 」で区切る
+#       元画像.png                         ← マスクは「元画像名(拡張子なし) + mask_suffix」
+#       元画像.png | マスク.tif
+#       元画像.png | マスク.tif | RFP画像.png | RFPマスク.tif    ← モザイク解析用（mosaic_compare.py）
+#   行頭に # を付けるとその行は使わない
+#
+# 画像は heatmap/pics/ に置く（git管理外）。
+# ==========================================================================
+
+[common]
+image_root = pics
+mask_suffix = _mask.tif
+
+[control]
+label = Control
+dir = control
+images =
+    Projections of 241106_Fz_002_second.png
+    Projections of 241106_Fz_control003.png
+    Projections of 20241024_controlFz001.png
+    Projections of 20241024_controlFz003.png
+
+[vang_rnai]
+label = vang RNAi
+dir = vang-rnai
+images =
+    C1-Projections of 20240929_Fz_GFP_loco_Gal4_UAS_vang_RNAi003.png
+    C1-Projections of 20241024_Fz_GFP.nd2-20241024_Fz_GFP-1.png
+    Projections of C1-20241024_Fz_GFP.nd2-20241024_Fz_GFP_3.png
+    Projections of C1-20241024_Fz_GFP.nd2-20241024_Fz_GFP_4.png
+
+# 旧 horseshoe-heatmaps.py / show-intensity-histgram.py では dir = vang だった
+[vang_cas9]
+label = vang Cas9
+dir = vang-cas9
+images =
+    Projections of 20250404_24%APF_Fz-GFP_loco-vang-Cas9P_001_ue.png
+    Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_sita.png
+    Projections of 20250413_24%APF_Fz-GFP_loco_vang_cas9P_001_ue.png
+    Projections of 20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P.nd2-20250518_25degree_24%APF_Fz-GFP_loco-vang-Cas9P_2.png
+
+# モザイク: fz RNAi（元画像 | 通常マスク | RFP画像 | RFPマスク）
+[mosaic_fz]
+label = fz RNAi mosaic
+dir = mosaic_fz_Fz
+images =
+    20250402_24%APF_Fz-GFP_fz-RNAi_sita_0063/C1-Projections of 20250402_24%APF_Fz-GFP_fz-RNAi_sita_0063.png | 20250402_24%APF_Fz-GFP_fz-RNAi_sita_0063/Merged_normal.tif | 20250402_24%APF_Fz-GFP_fz-RNAi_sita_0063/Merged.png | 20250402_24%APF_Fz-GFP_fz-RNAi_sita_0063/Merged_rfp.tif
+    20250403_again_24%APF_Fz-GFP_fz-RNAi_sita_0063/C1-Projections of 20250403_again_24%APF_Fz-GFP_fz-RNAi_sita_0063.png | 20250403_again_24%APF_Fz-GFP_fz-RNAi_sita_0063/Merged_normal.tif | 20250403_again_24%APF_Fz-GFP_fz-RNAi_sita_0063/Merged.png | 20250403_again_24%APF_Fz-GFP_fz-RNAi_sita_0063/Merged_rfp.tif
+
+# モザイク: control（2組目は旧 test_mosaic.py どおり通常マスクにも Merged_rfp.tif を使用）
+[mosaic_control]
+label = Control mosaic
+dir = mosaic_control
+images =
+    20250423_24%APF_Fz-GFP_RFP_ue/C1-Projections of 20250423_24%APF_Fz-GFP_RFP_ue.png | 20250423_24%APF_Fz-GFP_RFP_ue/Merged_normal.tif | 20250423_24%APF_Fz-GFP_RFP_ue/Merged.png | 20250423_24%APF_Fz-GFP_RFP_ue/Merged_rfp.tif
+    20250428_24%APF_Fz-GFP_sensRFP/C1-Projections of 20250428_24%APF_Fz-GFP_sensRFP.png | 20250428_24%APF_Fz-GFP_sensRFP/Merged_rfp.tif | 20250428_24%APF_Fz-GFP_sensRFP/Merged.png | 20250428_24%APF_Fz-GFP_sensRFP/Merged_rfp.tif

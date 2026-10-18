@@ -1,640 +1,155 @@
-"""
-Group Comparison T-Test Analysis for Horseshoe Orientation
+"""2群間で馬蹄形の向き（角度）を比較（Welch の t検定 + 箱ひげ図 + 極座標ヒストグラム）
 
-This script compares horseshoe orientation between control and test groups,
-performing t-tests on ventral and dorsal sides separately.
+用途: Control 群と Test 群（例: vang Cas9）で、馬蹄形の開口部の向きが変わるかを
+      Ventral / Dorsal 別に Welch の t検定で比べる（角度: 下 = 0°、右 = 90°、左 = -90°）。
+      向きは skeleton 法で推定する（orientation_polar.py と同じ）。
+入力: config/image_sets.txt の --control と --test のセット
+出力: output/group_comparison_ttest/<control>_vs_<test>.png
+        上段: Ventral / Dorsal の箱ひげ図（t検定のアスタリスク付き）
+        下段: Ventral / Dorsal の極座標ヒストグラム（2群を重ねる）
+      output/group_comparison_ttest/<control>_vs_<test>_ttest.csv  検定結果
 
 Usage:
-    python group_comparison_ttest.py
-
-Configure the CONTROL_FILES and TEST_FILES lists below with your image pairs.
+    python group_comparison_ttest.py                                  # figure_settings.txt の既定
+    python group_comparison_ttest.py --control R8control --test R8ori
+    python group_comparison_ttest.py --control 29d_R8control --test 29d_R8ori --both --no-show
 """
-
-import cv2
-import numpy as np
-import matplotlib.pyplot as plt
+import csv
 import sys
-import os
+
+import matplotlib.pyplot as plt
+import numpy as np
 from scipy import stats
-from skimage.morphology import skeletonize
-from collections import deque
 
-# =============================================================================
-# Configuration
-# =============================================================================
-
-# 除外する中心線の幅を定義
-EXCLUSION_WIDTH = 80
-
-# 極座標ヒストグラムのビンの幅 (-0.5° ~ 0.5°にするため)
-BIN_WIDTH_DEG = 10.0        # -5°〜+5°
-BIN_NUM = int(360 / BIN_WIDTH_DEG)+1  # 180
-
-# アノテーションに使用する色のHSV範囲を定義
-ANNOTATION_COLORS_HSV = {
-    "blue": {
-        "lower": np.array([100, 100, 100]),
-        "upper": np.array([130, 255, 255])
-    },
-    "cyan": {
-        "lower": np.array([85, 100, 100]),
-        "upper": np.array([100, 255, 255])
-    },
-    "magenta": {
-        "lower": np.array([140, 100, 100]),
-        "upper": np.array([170, 255, 255])
-    }
-}
-
-# =============================================================================
-# Control群とTest群のファイルリスト
-# =============================================================================
-
-# Control群のファイルリスト
-CONTROL_FILES = [
-    {'original': './pics/R8control/Projections of 20251105_25degree_24hours_senslexAlexOP_loco_cas9_contorl.nd2...5degree_24hours_senslexAlexOP_loco_cas9_contorl_r_image.png',
-     'mask': './pics/R8control/Projections of 20251105_25degree_24hours_senslexAlexOP_loco_cas9_contorl.nd2...5degree_24hours_senslexAlexOP_loco_cas9_contorl_r_image_mask.tif'},
-    {'original': './pics/R8control/Projections of 20251119_25d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi.nd2...5d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi_h.png',
-     'mask': './pics/R8control/Projections of 20251119_25d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi.nd2...5d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi_h_mask.tif'},
-    {'original': './pics/R8control/Projections of 20251119_25d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi.nd2...5d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi_r_h.png',
-     'mask': './pics/R8control/Projections of 20251119_25d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi.nd2...5d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi_r_h_mask.tif'},
-]
-
-# CONTROL_FILES = [
-#     {'original': './pics/29d_R8control/Projections of 20251022_29degree_20h_senslexAlexOPmCherry_Cas9_no_sgRNA.png', 
-#      'mask': './pics/29d_R8control/Projections of 20251022_29degree_20h_senslexAlexOPmCherry_Cas9_no_sgRNA_mask.tif'},
-# ]
-# Test群のファイルリスト
-TEST_FILES = [
-    {'original': './pics/R8ori/Projections of 20251105_25degree_24hours_senslexAlexOP_loco_vang_cas9001.nd2...5degree_24hours_senslexAlexOP_loco_vang_cas9001.png',
-     'mask': './pics/R8ori/Projections of 20251105_25degree_24hours_senslexAlexOP_loco_vang_cas9001.nd2...5degree_24hours_senslexAlexOP_loco_vang_cas9001_mask.tif'},
-    {'original': './pics/R8ori/Projections of 20251119_25d_22h_senslexAlexOPmCherry_loco--vang-cas9002.nd2-...25d_22h_senslexAlexOPmCherry_loco--vang-cas9002.png',
-     'mask': './pics/R8ori/Projections of 20251119_25d_22h_senslexAlexOPmCherry_loco--vang-cas9002.nd2-...25d_22h_senslexAlexOPmCherry_loco--vang-cas9002_mask.tif'},
-    {'original': './pics/R8ori/Projections of 20251129_25d_22h_senslexAlexOPmCherry_loco_vang_cas9.nd2-20251129_25d_22h_senslexAlexOPmCherry_loco_vang_cas9.png',
-     'mask': './pics/R8ori/Projections of 20251129_25d_22h_senslexAlexOPmCherry_loco_vang_cas9.nd2-20251129_25d_22h_senslexAlexOPmCherry_loco_vang_cas9_mask.tif'},
-    {'original': './pics/R8ori/Projections of 20251129_25d_22h_test_sensmCherry_loco_vang_cas9001.nd2-20251129_25d_22h_test_sensmCherry_loco_vang_cas9001.png',
-     'mask': './pics/R8ori/Projections of 20251129_25d_22h_test_sensmCherry_loco_vang_cas9001.nd2-20251129_25d_22h_test_sensmCherry_loco_vang_cas9001_mask.tif'},
-]
-# TEST_FILES = [
-#     {'original': './pics/29d_R8ori/Projections of 20251014_29degree_21hours_loco-Cas9-vang_R8_mCherry.png', 
-#      'mask': './pics/29d_R8ori/Projections of 20251014_29degree_21hours_loco-Cas9-vang_R8_mCherry_mask.tif'},
-# ]
-
-# =============================================================================
-# Helper Functions (from detect_arrow_improved.py)
-# =============================================================================
-
-def extract_color_mask(mask_image_bgr, color_name):
-    """指定された色のHSV範囲に基づいてマスクを抽出する"""
-    hsv = cv2.cvtColor(mask_image_bgr, cv2.COLOR_BGR2HSV)
-    color_ranges = ANNOTATION_COLORS_HSV[color_name]
-
-    mask1 = cv2.inRange(hsv, color_ranges["lower"], color_ranges["upper"])
-    if "lower2" in color_ranges:
-        mask2 = cv2.inRange(hsv, color_ranges["lower2"], color_ranges["upper2"])
-        final_mask = cv2.bitwise_or(mask1, mask2)
-    else:
-        final_mask = mask1
-    return final_mask
-
-
-def split_left_right(image):
-    """画像全体の中心X座標を左右分割線として返す"""
-    height, width = image.shape[:2]
-    image_center_x = width // 2
-    return image_center_x
-
-
-def find_skeleton_endpoints_and_branches(skeleton):
-    """骨格画像から端点と分岐点を検出する"""
-    endpoints = []
-    branch_points = []
-    rows, cols = skeleton.shape
-
-    for i in range(1, rows - 1):
-        for j in range(1, cols - 1):
-            if skeleton[i, j]:
-                neighbors = skeleton[i-1:i+2, j-1:j+2].sum() - 1
-                if neighbors == 1:
-                    endpoints.append((j, i))
-                elif neighbors >= 3:
-                    branch_points.append((j, i))
-
-    return endpoints, branch_points
-
-
-def bfs_distance(skeleton, start, end):
-    """骨格上でstartからendまでのBFS最短経路長を計算する"""
-    rows, cols = skeleton.shape
-    visited = np.zeros_like(skeleton, dtype=bool)
-    queue = deque([(start[0], start[1], 0)])
-    visited[start[1], start[0]] = True
-
-    directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
-
-    while queue:
-        x, y, dist = queue.popleft()
-
-        if (x, y) == end:
-            return dist
-
-        for dx, dy in directions:
-            nx, ny = x + dx, y + dy
-            if 0 <= nx < cols and 0 <= ny < rows:
-                if skeleton[ny, nx] and not visited[ny, nx]:
-                    visited[ny, nx] = True
-                    queue.append((nx, ny, dist + 1))
-
-    return -1
-
-
-def find_longest_path_endpoints(skeleton, endpoints):
-    """骨格グラフ上で最長パスを持つ端点ペアを見つける"""
-    if len(endpoints) < 2:
-        return None
-
-    max_dist = -1
-    best_pair = (endpoints[0], endpoints[1])
-
-    for i in range(len(endpoints)):
-        for j in range(i + 1, len(endpoints)):
-            dist = bfs_distance(skeleton, endpoints[i], endpoints[j])
-            if dist > max_dist:
-                max_dist = dist
-                best_pair = (endpoints[i], endpoints[j])
-
-    return best_pair, max_dist
-
-
-def calculate_horseshoe_orientation(contour):
-    """
-    馬蹄形輪郭から凹（開口部）の方向を推定し、画像下=0度、右=90度、左=-90度の角度を返す。
-    """
-    if len(contour) < 5:
-        return None
-
-    x, y, w, h = cv2.boundingRect(contour)
-
-    padding = 5
-    mask_w = w + 2 * padding
-    mask_h = h + 2 * padding
-
-    mask = np.zeros((mask_h, mask_w), dtype=np.uint8)
-    shifted_contour = contour - np.array([x - padding, y - padding])
-    cv2.drawContours(mask, [shifted_contour], -1, 255, cv2.FILLED)
-
-    skeleton = skeletonize(mask > 0)
-    endpoints, branch_points = find_skeleton_endpoints_and_branches(skeleton)
-
-    if len(endpoints) < 2:
-        return fallback_orientation(contour)
-
-    use_longest_path = len(endpoints) != 2 or len(branch_points) > 0
-
-    if not use_longest_path:
-        ep1, ep2 = endpoints[0], endpoints[1]
-    else:
-        result = find_longest_path_endpoints(skeleton, endpoints)
-        if result:
-            (ep1, ep2), path_dist = result
-        else:
-            max_dist = 0
-            ep1, ep2 = endpoints[0], endpoints[1]
-            for i in range(len(endpoints)):
-                for j in range(i + 1, len(endpoints)):
-                    dist = np.sqrt((endpoints[i][0] - endpoints[j][0])**2 +
-                                   (endpoints[i][1] - endpoints[j][1])**2)
-                    if dist > max_dist:
-                        max_dist = dist
-                        ep1, ep2 = endpoints[i], endpoints[j]
-
-    midpoint_local_x = (ep1[0] + ep2[0]) / 2
-    midpoint_local_y = (ep1[1] + ep2[1]) / 2
-
-    midpoint_x = midpoint_local_x + x - padding
-    midpoint_y = midpoint_local_y + y - padding
-
-    hull_points = cv2.convexHull(contour, returnPoints=True)
-    M_hull = cv2.moments(hull_points)
-    if M_hull["m00"] == 0:
-        return None
-    hull_cx = int(M_hull["m10"] / M_hull["m00"])
-    hull_cy = int(M_hull["m01"] / M_hull["m00"])
-
-    dx = midpoint_x - hull_cx
-    dy = midpoint_y - hull_cy
-
-    norm = np.sqrt(dx**2 + dy**2)
-    if norm < 1e-6:
-        return None
-
-    dx_norm = dx / norm
-    dy_norm = dy / norm
-
-    cx = int(midpoint_x)
-    cy = int(midpoint_y)
-
-    arrow_length = max(w, h) * 0.6
-    fx = int(cx + dx_norm * arrow_length)
-    fy = int(cy + dy_norm * arrow_length)
-
-    angle_rad_standard = np.arctan2(-dy, dx)
-    angle_deg_standard = np.degrees(angle_rad_standard)
-
-    orientation_angle = angle_deg_standard + 90
-
-    if orientation_angle > 180:
-        orientation_angle -= 360
-    elif orientation_angle <= -180:
-        orientation_angle += 360
-
-    return (orientation_angle, cx, cy, fx, fy)
-
-
-def fallback_orientation(contour):
-    """端点検出に失敗した場合のフォールバック"""
-    M = cv2.moments(contour)
-    if M["m00"] == 0:
-        return None
-
-    cx = int(M["m10"] / M["m00"])
-    cy = int(M["m01"] / M["m00"])
-
-    x, y, w, h = cv2.boundingRect(contour)
-    bx = x + w // 2
-    by = y + h // 2
-
-    angle_rad_standard = np.arctan2(cy - by, bx - cx)
-    angle_deg_standard = np.degrees(angle_rad_standard)
-
-    orientation_angle = angle_deg_standard + 90
-
-    if orientation_angle > 180:
-        orientation_angle -= 360
-    elif orientation_angle <= -180:
-        orientation_angle += 360
-
-    arrow_length = max(w, h) * 0.8
-    dx = bx - cx
-    dy = by - cy
-    norm = np.sqrt(dx**2 + dy**2)
-    if norm < 1e-6:
-        return None
-    fx = int(cx + (dx / norm) * arrow_length)
-    fy = int(cy + (dy / norm) * arrow_length)
-
-    return orientation_angle, cx, cy, fx, fy
-
-
-# =============================================================================
-# Main Processing Functions
-# =============================================================================
-
-def process_image_pair(original_file, mask_file):
-    """
-    1つの画像ペアを処理し、左側（ventral）と右側（dorsal）の角度リストを返す
-
-    Returns:
-        tuple: (ventral_angles, dorsal_angles)
-    """
-    ventral_angles = []
-    dorsal_angles = []
-
-    image_original = cv2.imread(original_file)
-    if image_original is None:
-        print(f"  [Warning] Cannot read original image: {original_file}")
-        return ventral_angles, dorsal_angles
-
-    image_mask = cv2.imread(mask_file)
-    if image_mask is None:
-        print(f"  [Warning] Cannot read mask image: {mask_file}")
-        return ventral_angles, dorsal_angles
-
-    image_center_x = split_left_right(image_mask)
-
-    all_horseshoe_masks = []
-    for color_name in ANNOTATION_COLORS_HSV.keys():
-        horseshoe_mask = extract_color_mask(image_mask, color_name)
-        all_horseshoe_masks.append(horseshoe_mask)
-
-    for single_horseshoe_mask in all_horseshoe_masks:
-        contours, _ = cv2.findContours(single_horseshoe_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        if not contours:
-            continue
-
-        for contour in contours:
-            if cv2.contourArea(contour) < 20:
-                continue
-
-            x, y, w, h = cv2.boundingRect(contour)
-            contour_center_x = x + w // 2
-
-            is_overlapping = (x < image_center_x < x + w)
-            if is_overlapping:
-                continue
-
-            if contour_center_x + EXCLUSION_WIDTH < image_center_x:
-                # 左側 (Ventral)
-                orientation_result = calculate_horseshoe_orientation(contour)
-                if orientation_result:
-                    angle, _, _, _, _ = orientation_result
-                    ventral_angles.append(angle)
-            elif contour_center_x - EXCLUSION_WIDTH > image_center_x:
-                # 右側 (Dorsal)
-                orientation_result = calculate_horseshoe_orientation(contour)
-                if orientation_result:
-                    angle, _, _, _, _ = orientation_result
-                    dorsal_angles.append(angle)
-
-    return ventral_angles, dorsal_angles
-
-
-def process_group(file_list, group_name):
-    """
-    グループ内の全ファイルを処理し、ventral/dorsalの角度を集計
-
-    Returns:
-        dict: {'ventral': [...], 'dorsal': [...]}
-    """
-    all_ventral = []
-    all_dorsal = []
-
-    print(f"\n{'='*60}")
-    print(f"Processing {group_name} group ({len(file_list)} files)")
-    print('='*60)
-
-    for i, file_info in enumerate(file_list):
-        original_file = file_info['original']
-        mask_file = file_info['mask']
-
-        print(f"\n  [{i+1}/{len(file_list)}] {os.path.basename(original_file)}")
-
-        ventral, dorsal = process_image_pair(original_file, mask_file)
-        all_ventral.extend(ventral)
-        all_dorsal.extend(dorsal)
-
-        print(f"    Ventral: {len(ventral)} cells, Dorsal: {len(dorsal)} cells")
-
-    print(f"\n  {group_name} Total: Ventral={len(all_ventral)}, Dorsal={len(all_dorsal)}")
-
-    return {'ventral': all_ventral, 'dorsal': all_dorsal}
-
-
-def perform_ttest(control_data, test_data, side_name):
-    """
-    2群間のt検定を実行
-
-    Args:
-        control_data: Control群の角度リスト
-        test_data: Test群の角度リスト
-        side_name: "Ventral" or "Dorsal"
-
-    Returns:
-        dict: t検定の結果
-    """
-    result = {
-        'side': side_name,
-        'control_n': len(control_data),
-        'test_n': len(test_data),
-        'control_mean': np.nan,
-        'control_std': np.nan,
-        'test_mean': np.nan,
-        'test_std': np.nan,
-        't_statistic': np.nan,
-        'p_value': np.nan
-    }
-
-    if len(control_data) < 2 or len(test_data) < 2:
-        print(f"  [Warning] Not enough data for t-test ({side_name})")
-        print(f"    Control n={len(control_data)}, Test n={len(test_data)}")
+from lib.orientation import METHODS, OrientationParams, collect_angles
+from lib.paths import FIGURE_SETTINGS_FILE, IMAGE_SETS_FILE, OUTPUT_DIR, ROOT
+from lib.plots import polar_hist, set_common_rlim, style_polar
+from shared.cli import add_image_sets_arg, preload_image_sets
+from shared.figure import finish, make_parser, save_figure
+from shared.horseshoe import get_image_set
+from shared.settings import load_figure_settings
+
+NAME = 'group_comparison_ttest'
+SIDE_LABELS = {'left': 'Ventral', 'right': 'Dorsal'}
+
+
+def p_to_asterisks(p):
+    if p is None or np.isnan(p):
+        return 'n.s.'
+    if p < 0.001:
+        return '***'
+    if p < 0.01:
+        return '**'
+    if p < 0.05:
+        return '*'
+    return 'n.s.'
+
+
+def welch_ttest(control, test):
+    result = {'control_n': len(control), 'test_n': len(test),
+              'control_mean': np.nan, 'control_std': np.nan, 'test_mean': np.nan, 'test_std': np.nan,
+              't_statistic': np.nan, 'p_value': np.nan}
+    if len(control) < 2 or len(test) < 2:
+        print(f"  警告: t検定にはデータが足りません（Control n={len(control)}, Test n={len(test)}）")
         return result
-
-    result['control_mean'] = np.mean(control_data)
-    result['control_std'] = np.std(control_data, ddof=1)
-    result['test_mean'] = np.mean(test_data)
-    result['test_std'] = np.std(test_data, ddof=1)
-
-    # Welch's t-test (equal_var=False)
-    t_stat, p_value = stats.ttest_ind(control_data, test_data, equal_var=False)
-
-    result['t_statistic'] = t_stat
-    result['p_value'] = p_value
-
+    result.update(control_mean=np.mean(control), control_std=np.std(control, ddof=1),
+                  test_mean=np.mean(test), test_std=np.std(test, ddof=1))
+    t_stat, p_value = stats.ttest_ind(control, test, equal_var=False)
+    result.update(t_statistic=t_stat, p_value=p_value)
     return result
 
 
-def print_ttest_results(ventral_result, dorsal_result):
-    """t検定の結果を表示"""
-    print("\n" + "="*70)
-    print("T-TEST RESULTS")
-    print("="*70)
-
-    for result in [ventral_result, dorsal_result]:
-        print(f"\n{result['side']} Side:")
-        print("-"*50)
-        print(f"  Control: n={result['control_n']}, "
-              f"mean={result['control_mean']:.2f}°, "
-              f"std={result['control_std']:.2f}°")
-        print(f"  vang Cas9:    n={result['test_n']}, "
-              f"mean={result['test_mean']:.2f}°, "
-              f"std={result['test_std']:.2f}°")
-        print(f"  t-statistic = {result['t_statistic']:.4f}")
-        print(f"  p-value = {result['p_value']:.10f}", end="")
-
-        if result['p_value'] < 0.001:
-            print(" ***")
-        elif result['p_value'] < 0.01:
-            print(" **")
-        elif result['p_value'] < 0.05:
-            print(" *")
-        else:
-            print(" (n.s.)")
-
-
-def get_asterisks(p_value):
-    """p値からアスタリスクを返す"""
-    if np.isnan(p_value):
-        return 'n.s.'
-    elif p_value < 0.001:
-        return '***'
-    elif p_value < 0.01:
-        return '**'
-    elif p_value < 0.05:
-        return '*'
-    else:
-        return 'n.s.'
-
-
-def plot_results(control_data, test_data, ventral_result, dorsal_result):
-    """結果を可視化"""
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-
-    # =================================
-    # 1. Ventral Box Plot (上段左)
-    # =================================
-    ax1 = axes[0, 0]
-    data_ventral = [control_data['ventral'], test_data['ventral']]
-    bp1 = ax1.boxplot(data_ventral, labels=['Control', 'vang Cas9'], patch_artist=True)
-    bp1['boxes'][0].set_facecolor('lightblue')
-    bp1['boxes'][1].set_facecolor('lightcoral')
-
-    ax1.set_ylabel('Orientation Angle (°)')
-    ax1.set_title(f"Ventral Side\n"
-                  f"Control: n={ventral_result['control_n']}, "
-                  f"mean={ventral_result['control_mean']:.1f}° ± {ventral_result['control_std']:.1f}°\n"
-                  f"vang Cas9: n={ventral_result['test_n']}, "
-                  f"mean={ventral_result['test_mean']:.1f}° ± {ventral_result['test_std']:.1f}°")
-    ax1.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
-    ax1.set_ylim(-180, 220)
-
-    # 線とアスタリスクの描画 (Ventral)
-    asterisks_ventral = get_asterisks(ventral_result['p_value'])
-    line_y1 = 120
-    star_y1 = line_y1 + 3
-    ax1.plot([1, 1, 2, 2], [line_y1, line_y1 + 5, line_y1 + 5, line_y1], lw=1.5, c='black')
-    ax1.text(1.5, star_y1, asterisks_ventral, ha='center', va='bottom', fontsize=14)
-
-    # =================================
-    # 2. Dorsal Box Plot (上段右)
-    # =================================
-    ax2 = axes[0, 1]
-    data_dorsal = [control_data['dorsal'], test_data['dorsal']]
-    bp2 = ax2.boxplot(data_dorsal, labels=['Control', 'vang Cas9'], patch_artist=True)
-    bp2['boxes'][0].set_facecolor('lightblue')
-    bp2['boxes'][1].set_facecolor('lightcoral')
-
-    ax2.set_ylabel('Orientation Angle (°)')
-    ax2.set_title(f"Dorsal Side\n"
-                  f"Control: n={dorsal_result['control_n']}, "
-                  f"mean={dorsal_result['control_mean']:.1f}° ± {dorsal_result['control_std']:.1f}°\n"
-                  f"vang Cas9: n={dorsal_result['test_n']}, "
-                  f"mean={dorsal_result['test_mean']:.1f}° ± {dorsal_result['test_std']:.1f}°")
-    ax2.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
-    ax2.set_ylim(-180, 220)
-
-    # 線とアスタリスクの描画 (Dorsal)
-    asterisks_dorsal = get_asterisks(dorsal_result['p_value'])
-    line_y2 = 120
-    star_y2 = line_y2 + 3
-    ax2.plot([1, 1, 2, 2], [line_y2, line_y2 + 5, line_y2 + 5, line_y2], lw=1.5, c='black')
-    ax2.text(1.5, star_y2, asterisks_dorsal, ha='center', va='bottom', fontsize=14)
-
-    # =================================
-    # 3. Ventral Polar Histogram (下段左)
-    # =================================
-    ax3 = fig.add_subplot(2, 2, 3, projection='polar')
-
-    bin_edges = np.linspace(-np.pi, np.pi, BIN_NUM, endpoint=False)
-
-    if control_data['ventral']:
-        ctrl_rad = np.radians(control_data['ventral'])
-        counts_ctrl, _ = np.histogram(ctrl_rad, bins=bin_edges)
-        prob_ctrl = counts_ctrl / counts_ctrl.sum() if counts_ctrl.sum() > 0 else counts_ctrl
-        centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        width = np.diff(bin_edges)
-        ax3.bar(centers, prob_ctrl, width=width, color='blue', alpha=0.5, label='Control')
-
-    if test_data['ventral']:
-        test_rad = np.radians(test_data['ventral'])
-        counts_test, _ = np.histogram(test_rad, bins=bin_edges)
-        prob_test_l = counts_test / counts_test.sum() if counts_test.sum() > 0 else counts_test
-        centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        width = np.diff(bin_edges)
-        ax3.bar(centers, prob_test_l, width=width, color='red', alpha=0.5, label='vang Cas9')
-
-    ax3.set_theta_zero_location("S")
-    ax3.set_xticks(np.radians([0, 90, 180, 270]))
-    ax3.set_xticklabels(['0°', '90°', '180°', '-90°'])
-    ax3.set_rlabel_position(135)
-    ax3.set_title('Ventral - Polar Histogram', va='bottom', pad=20)
-    ax3.legend(loc='upper right', bbox_to_anchor=(1.3, 1.0))
-
-    # =================================
-    # 4. Dorsal Polar Histogram (下段右)
-    # =================================
-    ax4 = fig.add_subplot(2, 2, 4, projection='polar')
-
-    if control_data['dorsal']:
-        ctrl_rad = np.radians(control_data['dorsal'])
-        counts_ctrl, _ = np.histogram(ctrl_rad, bins=bin_edges)
-        prob_ctrl = counts_ctrl / counts_ctrl.sum() if counts_ctrl.sum() > 0 else counts_ctrl
-        centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        width = np.diff(bin_edges)
-        ax4.bar(centers, prob_ctrl, width=width, color='blue', alpha=0.5, label='Control')
-
-    if test_data['dorsal']:
-        test_rad = np.radians(test_data['dorsal'])
-        counts_test, _ = np.histogram(test_rad, bins=bin_edges)
-        prob_test_r = counts_test / counts_test.sum() if counts_test.sum() > 0 else counts_test
-        centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        width = np.diff(bin_edges)
-        ax4.bar(centers, prob_test_r, width=width, color='red', alpha=0.5, label='vang Cas9')
-
-    ax4.set_theta_zero_location("S")
-    ax4.set_xticks(np.radians([0, 90, 180, 270]))
-    ax4.set_xticklabels(['0°', '90°', '180°', '-90°'])
-    ax4.set_rlabel_position(135)
-    ax4.set_title('Dorsal - Polar Histogram', va='bottom', pad=20)
-    ax4.legend(loc='upper right', bbox_to_anchor=(1.3, 1.0))
-
-    # 左右のr軸を統一（最大確率に基づく）
-    max_prob = max(prob_test_l.max() if len(prob_test_l) > 0 else 0,
-                   prob_test_r.max() if len(prob_test_r) > 0 else 0)
-    r_max = max_prob * 1.1 if max_prob > 0 else 1  # 少し余裕を持たせる
-    ax3.set_rlim(0, r_max)
-    ax4.set_rlim(0, r_max)
-
-    # Remove the default subplot created for polar plots
-    axes[1, 0].remove()
-    axes[1, 1].remove()
-
-    plt.tight_layout()
-    plt.savefig('group_comparison_results.png', dpi=150, bbox_inches='tight')
-    print("\n[Info] Results saved to 'group_comparison_results.png'")
-    plt.show()
-
-
-# =============================================================================
-# Main
-# =============================================================================
-
 def main():
-    print("="*70)
-    print("Group Comparison T-Test Analysis for Horseshoe Orientation")
-    print("="*70)
+    sets_file, sets = preload_image_sets(IMAGE_SETS_FILE, ROOT)
+    s = load_figure_settings(FIGURE_SETTINGS_FILE, NAME)
 
-    # Control群の処理
-    control_data = process_group(CONTROL_FILES, "Control")
+    parser = make_parser(__doc__, NAME, [f"画像セット: config/image_sets.txt（定義済み: {', '.join(sets)}）"])
+    add_image_sets_arg(parser, sets_file)
+    parser.add_argument('--control', default=s.str('control_set') or None, choices=list(sets),
+                        help='Control 群のセット名')
+    parser.add_argument('--test', default=s.str('test_set') or None, choices=list(sets),
+                        help='Test 群のセット名')
+    parser.add_argument('--method', choices=METHODS, default=None,
+                        help=f"向きの推定方法（既定: {s.str('method', 'skeleton')}）")
+    parser.add_argument('--center-margin', type=int, default=None,
+                        help=f"中心線から何px以内の馬蹄形を除外するか（既定: {s.int('center_margin', 80)}）")
+    args = parser.parse_args()
+    if not (args.control and args.test):
+        parser.error('--control と --test を指定してください')
 
-    # Test群の処理
-    test_data = process_group(TEST_FILES, "vang Cas9")
+    control_set = get_image_set(sets, args.control)
+    test_set = get_image_set(sets, args.test)
+    params = OrientationParams.from_settings(s, method=args.method, center_margin=args.center_margin)
 
-    # T検定の実行
-    print("\n" + "="*70)
-    print("Performing T-Tests...")
-    print("="*70)
+    data = {}
+    for key, st in (('control', control_set), ('test', test_set)):
+        print(f"\n{'=' * 60}\n{st.label} ({st.name}): {len(st.pairs)} 組\n{'=' * 60}")
+        data[key] = collect_angles(st.pairs, params, annotate=False)['angles']
+        print(f"  合計: Ventral {len(data[key]['left'])} 個, Dorsal {len(data[key]['right'])} 個")
+        if not (data[key]['left'] or data[key]['right']):
+            sys.exit(f"エラー: [{st.name}] から馬蹄形が1つも取れませんでした。config/image_sets.txt と pics/ を確認してください。")
 
-    ventral_result = perform_ttest(
-        control_data['ventral'],
-        test_data['ventral'],
-        "Ventral"
-    )
+    print(f"\n{'=' * 70}\nT-TEST RESULTS (Welch)\n{'=' * 70}")
+    results = {}
+    for side, label in SIDE_LABELS.items():
+        r = welch_ttest(data['control'][side], data['test'][side])
+        results[side] = r
+        print(f"\n{label} Side:")
+        print(f"  {control_set.label}: n={r['control_n']}, mean={r['control_mean']:.2f}°, std={r['control_std']:.2f}°")
+        print(f"  {test_set.label}: n={r['test_n']}, mean={r['test_mean']:.2f}°, std={r['test_std']:.2f}°")
+        print(f"  t = {r['t_statistic']:.4f}, p = {r['p_value']:.10f} {p_to_asterisks(r['p_value'])}")
 
-    dorsal_result = perform_ttest(
-        control_data['dorsal'],
-        test_data['dorsal'],
-        "Dorsal"
-    )
+    out_dir = OUTPUT_DIR / NAME
+    out_dir.mkdir(parents=True, exist_ok=True)
+    tag = f'{control_set.name}_vs_{test_set.name}'
+    with open(out_dir / f'{tag}_ttest.csv', 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        keys = list(results['left'])
+        writer.writerow(['side', *keys])
+        for side, label in SIDE_LABELS.items():
+            writer.writerow([label, *[results[side][k] for k in keys]])
 
-    # 結果の表示
-    print_ttest_results(ventral_result, dorsal_result)
+    labels = [control_set.label, test_set.label]
+    colors = s.list('group_colors', ['blue', 'red'])
+    box_colors = s.list('box_colors', ['lightblue', 'lightcoral'])
+    fig = plt.figure(figsize=s.floats('figsize', (14, 10)))
 
-    # 可視化
-    plot_results(control_data, test_data, ventral_result, dorsal_result)
+    # 上段: 箱ひげ図
+    for col, (side, label) in enumerate(SIDE_LABELS.items(), start=1):
+        ax = fig.add_subplot(2, 2, col)
+        r = results[side]
+        bp = ax.boxplot([data['control'][side], data['test'][side]], tick_labels=labels, patch_artist=True)
+        for patch, color in zip(bp['boxes'], box_colors):
+            patch.set_facecolor(color)
+        ax.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
+        s.apply(ax, prefix='box_')
+        ax.set_title(
+            f"{label} Side\n"
+            f"{labels[0]}: n={r['control_n']}, mean={r['control_mean']:.1f}° ± {r['control_std']:.1f}°\n"
+            f"{labels[1]}: n={r['test_n']}, mean={r['test_mean']:.1f}° ± {r['test_std']:.1f}°",
+            fontsize=s.float('title_fontsize'))
+        line_y = s.float('bracket_y', 120)
+        height = s.float('bracket_height', 5)
+        ax.plot([1, 1, 2, 2], [line_y, line_y + height, line_y + height, line_y], lw=1.5, c='black')
+        ax.text(1.5, line_y + 3, p_to_asterisks(r['p_value']), ha='center', va='bottom',
+                fontsize=s.float('star_fontsize', 14))
 
-    return control_data, test_data, ventral_result, dorsal_result
+    # 下段: 極座標ヒストグラム（2群を重ねる）
+    polar_axes, values = [], []
+    for col, (side, label) in enumerate(SIDE_LABELS.items(), start=3):
+        ax = fig.add_subplot(2, 2, col, projection='polar')
+        for key, group_label, color in (('control', labels[0], colors[0]), ('test', labels[1], colors[1])):
+            values.append(polar_hist(ax, data[key][side], s, color, label=group_label))
+        style_polar(ax, s)
+        ax.set_title(s.str('polar_title', '{side} - Polar Histogram').format(side=label), va='bottom', pad=20)
+        ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.0))
+        polar_axes.append(ax)
+    set_common_rlim(polar_axes, values)
+
+    fig.tight_layout()
+    save_figure(fig, tag, args, s, out_dir)
+    finish(args)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
