@@ -11,6 +11,8 @@ def extract_green_points(image):
     upper_green = np.array([80, 255, 255])
     mask = cv2.inRange(hsv, lower_green, upper_green)
     points = cv2.findNonZero(mask)
+    if points is None:
+        raise ValueError("画像内に緑色領域が見つかりませんでした。HSV範囲または入力画像を確認してください。")
     return points.reshape(-1, 2), mask
 
 def perform_pca(points):

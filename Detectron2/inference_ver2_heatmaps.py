@@ -8,11 +8,15 @@ import numpy as np
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
-import seaborn as sns
 import sys
 import argparse
 
 from func.cli_errors import require_file, run_main
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+from figure_style import plot_vd_heatmap_figure  # noqa: E402
 
 # --- Detectron2 Configuration ---
 def setup_predictor(model_path, score_threshold=0.25):
@@ -71,10 +75,17 @@ def split_left_right(image):
 def create_average_heatmap(masks, original_image, target_size=(100, 100)):
     """
     複数のマスクから平均ヒートマップを生成する関数。
+
+    戻り値は正規化前の平均GFP輝度（float, 元画像と同じ0-255スケール）。
+    左右（V/D）のヒートマップをそれぞれ独立に0-255へmin-max正規化すると、
+    暗い側でも「その中で一番明るいピクセル」が255になり、V/D間の絶対的な
+    明るさの違いが図から読み取れなくなるため、ここでは正規化しない。
+    表示時のスケーリングは figure_style.plot_vd_heatmap_figure() が
+    左右で共有するvmin/vmaxを使って行う。
     """
     if not masks:
         print("有効なマスクがありません。ヒートマップは黒くなります。")
-        return np.zeros(target_size, dtype=np.uint8)
+        return np.zeros(target_size, dtype=np.float32)
     aligned_gfp_data = []
     h_img, w_img = original_image.shape[:2]
     for mask in masks:
@@ -94,10 +105,9 @@ def create_average_heatmap(masks, original_image, target_size=(100, 100)):
             aligned_gfp_data.append(resized_gfp)
     if not aligned_gfp_data:
         print("リサイズ可能なマスク領域がありませんでした。")
-        return np.zeros(target_size, dtype=np.uint8)
+        return np.zeros(target_size, dtype=np.float32)
     average_heatmap = np.mean(np.array(aligned_gfp_data), axis=0).astype(np.float32)
-    final_heatmap = cv2.normalize(average_heatmap, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-    return final_heatmap
+    return average_heatmap
 
 # --- Main Processing Logic ---
 def process_images(input_paths, predictor, class_names):
@@ -181,38 +191,37 @@ def process_images(input_paths, predictor, class_names):
         
     return all_masks_left_total, all_masks_right_total, debug_images, image_cropped
 
-def plot_results(debug_images, heatmap_left, heatmap_right):
+def plot_debug_grid(debug_images):
     """
-    Plots the visualization images and heatmaps.
+    入力画像ごとの検出結果（クロップ+輪郭色分け）を並べた診断用の図。
+    論文用ではなく、検出が正しく左右分類できているかの確認用。
     """
+    if not debug_images:
+        return
     num_image_sets = len(debug_images)
-    num_plots = 3
-    num_rows_for_display = max(num_image_sets, 1)
-    
-    fig, axes = plt.subplots(num_rows_for_display, num_plots, figsize=(15, 6 * num_rows_for_display))
-    axes = axes.flatten() if num_rows_for_display > 1 else [axes]
-    
-    for i in range(num_image_sets):
-        ax = axes[i * num_plots]
-        ax.imshow(debug_images[i])
-        ax.set_title(f'Detected Horseshoes {i+1} \n(Cropped)')
+    cols = min(3, num_image_sets)
+    rows = (num_image_sets + cols - 1) // cols
+    fig, axes = plt.subplots(rows, cols, figsize=(5 * cols, 5 * rows), squeeze=False)
+    axes = axes.flatten()
+    for i, ax in enumerate(axes):
+        if i < num_image_sets:
+            ax.imshow(debug_images[i])
+            ax.set_title(f'Detected horseshoes {i + 1} (cropped)', fontsize=11)
         ax.axis('off')
-
-    ax_left = axes[1]
-    sns.heatmap(heatmap_left, cmap='viridis', cbar_kws={'label': 'Normalized Average GFP Intensity'}, vmin=0, vmax=255, ax=ax_left)
-    ax_left.set_title('Average GFP Intensity Heatmap (Left)')
-    ax_left.set_xticks([])
-    ax_left.set_yticks([])
-    ax_left.set_aspect('equal')
-
-    ax_right = axes[2]
-    sns.heatmap(heatmap_right, cmap='viridis', cbar_kws={'label': 'Normalized Average GFP Intensity'}, vmin=0, vmax=255, ax=ax_right)
-    ax_right.set_title('Average GFP Intensity Heatmap (Right)')
-    ax_right.set_xticks([])
-    ax_right.set_yticks([])
-    ax_right.set_aspect('equal')
-
     plt.tight_layout()
+    plt.show()
+
+
+def plot_results(heatmap_left, heatmap_right, n_left, n_right):
+    """
+    V/D平均輝度ヒートマップの比較図（論文品質、左右で共有カラースケール）。
+    """
+    fig, axes = plot_vd_heatmap_figure(
+        heatmap_left, heatmap_right,
+        n_v=n_left, n_d=n_right,
+        v_label="Ventral (V)", d_label="Dorsal (D)",
+        colorbar_label="Mean GFP intensity (a.u.)",
+    )
     plt.show()
 
 # --- Main Execution ---
@@ -261,7 +270,8 @@ def main():
     heatmap_left = create_average_heatmap(all_masks_left, image_cropped, target_size)
     heatmap_right = create_average_heatmap(all_masks_right, image_cropped, target_size)
 
-    plot_results(debug_images, heatmap_left, heatmap_right)
+    plot_debug_grid(debug_images)
+    plot_results(heatmap_left, heatmap_right, len(all_masks_left), len(all_masks_right))
 
     cv2.destroyAllWindows()
 

@@ -47,8 +47,8 @@ def extract_color_masks(mask_path):
     """
     マスク画像から色別にマスクを抽出
 
-    - blue, cyan → horseshoe (category_id: 0)
-    - magenta → negative (category_id: 1)
+    - blue, cyan, magenta → horseshoe (category_id: 0)
+    - red → negative (category_id: 1)
 
     Returns:
         list of (mask, category_id) tuples

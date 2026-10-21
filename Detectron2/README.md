@@ -55,8 +55,8 @@ Mask R-CNN（ResNet-50 FPN）の学習スクリプト。
 |-----------|--------|-------------|
 | 赤色 | negative | 1 |
 | 青色 | horseshoe | 0 |
-| 緑色 | horseshoe | 0 |
-| 黄色 | horseshoe | 0 |
+| シアン | horseshoe | 0 |
+| マゼンタ | horseshoe | 0 |
 
 - `../data/train/images/` - 学習用画像
 - `../data/train/masks/` - 学習用マスク

@@ -73,14 +73,14 @@ light-intensity-calculator/
 ## コマンド
 
 ```bash
+# データセット準備（マスク画像からアノテーション生成）
+python Detectron2/dataset_preparation.py
+
 # 学習
 python Detectron2/train.py
 
-# 推論（輝度計算）
-python Detectron2/inference_split_calc.py
-
 # 推論（ヒートマップ付き）
-python Detectron2/inference_heatmaps.py
+python Detectron2/inference_ver2_heatmaps.py
 ```
 
 ## 開発ガイドライン

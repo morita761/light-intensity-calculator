@@ -30,23 +30,21 @@ Facebook Detectron2フレームワークを使用した物体検出・セグメ�
 | ファイル | 説明 |
 |---------|------|
 | `train.py` | Mask R-CNN（ResNet-50 FPN）の学習スクリプト |
-| `inference_split_calc.py` | 推論 + V-D分割 + 輝度計算（CSV出力） |
-| `inference_heatmaps.py` | 推論 + ヒートマップ生成（複数画像対応） |
-| `inference_ver2_heatmaps.py` | 改良版ヒートマップ（箱ひげ図付き） |
-| `inference_threshold.py` | 信頼度閾値によるフィルタリング推論 |
+| `dataset_preparation.py` | マスク画像からCOCO形式のアノテーションJSONを生成 |
+| `inference_ver2_heatmaps.py` | 推論 + V-D分割ヒートマップ生成（箱ひげ図付き） |
 | `func/intensityCalc.py` | PCA + K-Meansによる左右分割・輝度計算 |
 | `func/splitobje.py` | 馬蹄形の分離処理 |
 
 **使い方:**
 ```bash
+# データセット準備（マスク画像からアノテーション生成）
+python Detectron2/dataset_preparation.py
+
 # 学習
 python Detectron2/train.py
 
-# 推論（輝度計算）
-python Detectron2/inference_split_calc.py
-
 # 推論（ヒートマップ付き）
-python Detectron2/inference_heatmaps.py
+python Detectron2/inference_ver2_heatmaps.py
 ```
 
 ---

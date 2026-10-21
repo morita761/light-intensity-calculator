@@ -47,7 +47,11 @@ def split_left_right(image):
 
     # 緑色のマスクを作成
     mask = cv2.inRange(hsv, lower_green, upper_green)
-    x, y, w, h = cv2.boundingRect(cv2.findNonZero(mask))
+    if cv2.countNonZero(mask) == 0:
+        height, width = mask.shape[:2]
+        x, y, w, h = 0, 0, width, height
+    else:
+        x, y, w, h = cv2.boundingRect(cv2.findNonZero(mask))
     left_mask = np.zeros_like(mask)
     right_mask = np.zeros_like(mask)
     left_mask[y:y+h, x:x + w//2] = mask[y:y+h, x:x + w//2]
