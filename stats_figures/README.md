@@ -14,6 +14,7 @@
 | `parse_intensity_text_file.py` | control/cas9の2ファイルを画像ごとにノーマライズして4つのCSVに分割出力 |
 | `linefig.py` | 複数CSVから線グラフ描画（最大/最小/平均値表示） |
 | `rename_screenshots.py` | スクリーンショットを日時順に2枚一組で `1-R`, `1-L`, `2-R`, ... にリネームしてコピー（開始番号は `START_NUMBER` で変更） |
+| `ocr_screenshots.py` | フォルダ内のPNGの1枚目で範囲を選択（座標は `ocr_roi.json` に保存して全画像に適用）し、Tesseractで文字を抽出してCSV出力 |
 
 ### データファイル
 
