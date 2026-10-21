@@ -13,6 +13,7 @@
 | `process_data.py` | テキストファイルをV/Dで分割・ノーマライズしてCSV出力 |
 | `parse_intensity_text_file.py` | control/cas9の2ファイルを画像ごとにノーマライズして4つのCSVに分割出力 |
 | `linefig.py` | 複数CSVから線グラフ描画（最大/最小/平均値表示） |
+| `rename_screenshots.py` | スクリーンショットを日時順に2枚一組で `1-R`, `1-L`, `2-R`, ... にリネームしてコピー（開始番号は `START_NUMBER` で変更） |
 
 ### データファイル
 
