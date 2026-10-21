@@ -21,6 +21,11 @@ TESSERACT_LANG = 'eng'              # 日本語も読む場合は 'eng+jpn'（te
 UPSCALE = 3                         # スクショの小さい文字を拡大してから読む倍率
 DISPLAY_MAX = 1400                  # 範囲選択ウィンドウの最大表示サイズ（px）
 
+# 認識結果のチェック
+# 領域内に出てくる決まった文字列（空白を含んでもよい）。これと数値以外が認識されたら警告を出す
+ALLOWED_STRINGS = ['Mean', 'Median']
+NUMBER_PATTERN = re.compile(r'^-?\d+\.\d+$')   # 小数点ありの数値（整数も許す場合は r'^-?\d+(\.\d+)?$'）
+
 
 def natural_key(file_name):
     """ '2-R.png' が '10-R.png' より前に来るよう、数字部分を数値として比較する """
@@ -77,6 +82,14 @@ def preprocess(crop):
     return binary
 
 
+def find_unexpected_tokens(line):
+    """ 決まった文字列を取り除いたあと、小数点ありの数値に当てはまらないトークンを返す """
+    # 長い文字列から先に消す（'Mean gray' と 'Mean' の両方がある場合など）
+    for s in sorted(ALLOWED_STRINGS, key=len, reverse=True):
+        line = line.replace(s, ' ')
+    return [t for t in line.split() if not NUMBER_PATTERN.match(t)]
+
+
 def ocr_image(image_path, roi):
     img = cv2.imread(image_path)
     if img is None:
@@ -116,18 +129,25 @@ def main():
         os.makedirs(CROP_DIR, exist_ok=True)
 
     # 1行 = 画像内のテキスト1行。空白区切りで col1, col2, ... に分割する
+    # 想定外の文字が認識された行は warning 列にそのトークンを書く
     rows = []
+    warning_count = 0
     for image_path in image_files:
+        image_name = os.path.basename(image_path)
         text = ocr_image(image_path, roi)
         if text is None:
             continue
         lines = [line.strip() for line in text.splitlines() if line.strip()]
         for line_no, line in enumerate(lines, 1):
-            rows.append([os.path.basename(image_path), line_no, line] + line.split())
-        print(f"🔍 {os.path.basename(image_path)}: {len(lines)}行")
+            unexpected = find_unexpected_tokens(line)
+            if unexpected:
+                warning_count += 1
+                print(f"⚠️ 警告: {image_name} {line_no}行目に想定外の文字があります: {unexpected}  (行: {line})")
+            rows.append([image_name, line_no, line, ' '.join(unexpected)] + line.split())
+        print(f"🔍 {image_name}: {len(lines)}行")
 
-    max_cols = max((len(r) - 3 for r in rows), default=0)
-    header = ['image', 'line', 'text'] + [f'col{i}' for i in range(1, max_cols + 1)]
+    max_cols = max((len(r) - 4 for r in rows), default=0)
+    header = ['image', 'line', 'text', 'warning'] + [f'col{i}' for i in range(1, max_cols + 1)]
 
     # utf-8-sig: Excelで開いたときに文字化けしないようにする
     with open(OUTPUT_CSV, 'w', newline='', encoding='utf-8-sig') as f:
@@ -136,6 +156,8 @@ def main():
         writer.writerows(rows)
 
     print(f"\n✅ {len(image_files)}枚から {len(rows)}行を {OUTPUT_CSV} に出力しました。")
+    if warning_count:
+        print(f"⚠️ 想定外の文字を含む行が {warning_count}行あります。CSVの warning 列を確認してください。")
     if CROP_DIR:
         print(f"   OCRに渡した画像は {CROP_DIR}/ で確認できます。")
 
