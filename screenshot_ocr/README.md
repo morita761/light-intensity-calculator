@@ -13,6 +13,7 @@ Photoshop のヒストグラムパネル（平均 / 標準偏差 / 中間値 / �
 | 3 | `ocr_to_vd_csv.py` | `NAMES` に並べた画像セットの OCR 結果を、1測定1行の `vd_intensity.csv` にまとめる。`position` は番号を書き込んだ写真 `label-<NAME>.png` の番号の x 座標を3等分して決める（座標は `label_coords-<NAME>.csv` に保存して再利用） |
 | - | `compare_ocr_vs_re.py` | OCR の平均値と Photoshop の計測ログ（`<NAME>_grayvalue_RE.txt`）を比較プロット |
 | - | `extract_label_coords.py` | （`ocr_to_vd_csv.py` から呼ばれる。単体でも実行可）画像に白文字で書き込まれた番号（測定番号）を検出して読み取り、番号ごとの中心座標・外接矩形を `label_coords.csv` に出力（確認用に `label_coords_check.png` も保存） |
+| - | `rfp_judge_test.py` | 【テスト】番号ごとに対応する馬蹄形の輪郭の色を判定し、マゼンタなら RFP = Yes として `rfp_judge.csv` に出力（確認用に `rfp_judge_check.png`） |
 
 ## 補足
 
