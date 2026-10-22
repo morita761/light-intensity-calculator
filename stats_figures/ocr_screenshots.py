@@ -3,28 +3,30 @@ import re
 import csv
 import json
 import cv2
-import pytesseract
+import numpy as np
 
 # --- 設定（ハードコード） ---
-INPUT_DIR = 'screenshots_renamed'   # PNGが入っているフォルダ
+NAME = '20241024_controlFz003'
+INPUT_DIR = 'rename-'+NAME   # PNGが入っているフォルダ
 ROI_FILE = 'ocr_roi.json'           # 選択した範囲の保存先（次回以降はこれを再利用）
-OUTPUT_CSV = 'ocr_result.csv'       # 抽出結果の出力先
-RESELECT_ROI = False                # True にすると保存済みの範囲を無視して選び直す
-CROP_DIR = 'ocr_crops'              # OCRに渡した前処理後の画像の保存先（確認用、Noneで保存しない）
+OUTPUT_CSV = 'ocr_result-'+NAME+'.csv'  # 抽出結果の出力先（ocr_to_vd_csv.py がこの名前で読み込む）
+RESELECT_ROI = True                # True にすると保存済みの範囲を無視して選び直す
+CROP_DIR = 'ocr_crops-'+NAME             # OCRに渡した前処理後の画像の保存先（確認用、Noneで保存しない）
 
-# OCR設定 (Tesseract)
-# --psm 6: 領域を「1つのテキストブロック」として読む（表・数値の列向き）
-# 文字を数字などに限定したい場合は tessedit_char_whitelist を指定する
-TESSERACT_CONFIG = '--psm 6'
-# TESSERACT_CONFIG = '--psm 6 -c tessedit_char_whitelist=0123456789.,-'
-TESSERACT_LANG = 'eng'              # 日本語も読む場合は 'eng+jpn'（tesseract-ocr-jpn が必要）
-UPSCALE = 3                         # スクショの小さい文字を拡大してから読む倍率
+# 文字認識設定（テンプレート照合）
+# 画面の文字はスクショごとにピクセル単位で同じ形なので、Tesseractではなく文字の形をテンプレートと完全一致で照合する
+# （Tesseractはこのドットフォントの 5 を $ や 3 と誤認識するため使わない）
+# テンプレートにない形は '?' になり警告が出る。画面の拡大率やフォントが変わったらテンプレートを作り直す必要がある
+TEMPLATE_FILE = 'ocr_templates.json'  # 文字ごとの2値パターン（'#'=文字, '.'=背景）
+TEXT_THRESHOLD = 150                # この輝度より明るい画素を文字とみなす（背景 約80, 文字 最大 約210）
+CROP_SCALE = 8                      # 確認用画像の拡大倍率
 DISPLAY_MAX = 1400                  # 範囲選択ウィンドウの最大表示サイズ（px）
 
 # 認識結果のチェック
-# 領域内に出てくる決まった文字列（空白を含んでもよい）。これと数値以外が認識されたら警告を出す
-ALLOWED_STRINGS = ['Mean', 'Median']
-NUMBER_PATTERN = re.compile(r'^-?\d+\.\d+$')   # 小数点ありの数値（整数も許す場合は r'^-?\d+(\.\d+)?$'）
+# 整数・小数以外（文字列）が認識されたら警告を出す
+# 警告から除外したい決まった文字列があればここに追加する（例: ['Mean', 'Median']）
+ALLOWED_STRINGS = []
+NUMBER_PATTERN = re.compile(r'^-?\d+(\.\d+)?$')   # 整数または小数
 
 
 def natural_key(file_name):
@@ -72,25 +74,62 @@ def load_or_select_roi(image_files):
     return roi
 
 
-def preprocess(crop):
-    """ グレースケール → 拡大 → 大津の2値化（背景が暗ければ反転して白背景・黒文字に揃える） """
-    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-    gray = cv2.resize(gray, None, fx=UPSCALE, fy=UPSCALE, interpolation=cv2.INTER_CUBIC)
-    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    if binary.mean() < 127:
-        binary = cv2.bitwise_not(binary)
-    return binary
+def load_templates():
+    """ {文字: 2値配列} を返す。幅の広いものから照合するよう並べる """
+    with open(TEMPLATE_FILE, 'r', encoding='utf-8') as f:
+        raw = json.load(f)
+    templates = {ch: np.array([[c == '#' for c in row] for row in rows]) for ch, rows in raw.items()}
+    return sorted(templates.items(), key=lambda t: t[1].shape[1], reverse=True)
+
+
+def find_runs(mask):
+    """ True が連続する区間 [(開始, 終了), ...] を返す """
+    runs, start = [], None
+    for i, v in enumerate(mask):
+        if v and start is None:
+            start = i
+        elif not v and start is not None:
+            runs.append((start, i))
+            start = None
+    if start is not None:
+        runs.append((start, len(mask)))
+    return runs
+
+
+def read_line(line, templates):
+    """
+    1行分の2値画像を左から順にテンプレートと照合して文字列にする。
+    文字同士がくっついていても、テンプレートの幅ぶん完全一致すれば読める。
+    どのテンプレートにも一致しない部分は '?' にして次の空白列まで飛ばす。
+    """
+    text = ''
+    x, width = 0, line.shape[1]
+    while x < width:
+        if not line[:, x].any():
+            x += 1
+            continue
+        for ch, tpl in templates:
+            tw = tpl.shape[1]
+            if tpl.shape[0] == line.shape[0] and x + tw <= width and np.array_equal(line[:, x:x + tw], tpl):
+                text += ch
+                x += tw
+                break
+        else:
+            text += '?'
+            while x < width and line[:, x].any():
+                x += 1
+    return text
 
 
 def find_unexpected_tokens(line):
-    """ 決まった文字列を取り除いたあと、小数点ありの数値に当てはまらないトークンを返す """
+    """ 決まった文字列を取り除いたあと、整数・小数に当てはまらないトークンを返す """
     # 長い文字列から先に消す（'Mean gray' と 'Mean' の両方がある場合など）
     for s in sorted(ALLOWED_STRINGS, key=len, reverse=True):
         line = line.replace(s, ' ')
     return [t for t in line.split() if not NUMBER_PATTERN.match(t)]
 
 
-def ocr_image(image_path, roi):
+def ocr_image(image_path, roi, templates):
     img = cv2.imread(image_path)
     if img is None:
         print(f"⚠️ 警告: 読み込みに失敗しました: {image_path}")
@@ -102,11 +141,15 @@ def ocr_image(image_path, roi):
         print(f"⚠️ 警告: 範囲が画像の外です: {image_path} (画像サイズ {img.shape[1]}x{img.shape[0]})")
         return None
 
-    binary = preprocess(crop)
+    binary = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY) > TEXT_THRESHOLD
     if CROP_DIR:
-        cv2.imwrite(os.path.join(CROP_DIR, os.path.basename(image_path)), binary)
+        view = (~binary).astype(np.uint8) * 255   # 白背景・黒文字で保存
+        view = cv2.resize(view, None, fx=CROP_SCALE, fy=CROP_SCALE, interpolation=cv2.INTER_NEAREST)
+        cv2.imwrite(os.path.join(CROP_DIR, os.path.basename(image_path)), view)
 
-    return pytesseract.image_to_string(binary, lang=TESSERACT_LANG, config=TESSERACT_CONFIG)
+    # 文字のある行のまとまり = テキスト1行
+    lines = [read_line(binary[r0:r1], templates) for r0, r1 in find_runs(binary.any(axis=1))]
+    return '\n'.join(lines)
 
 
 def main():
@@ -119,6 +162,11 @@ def main():
     if not image_files:
         print(f"エラー: {INPUT_DIR} にPNGファイルが見つかりません。")
         return
+
+    if not os.path.exists(TEMPLATE_FILE):
+        print(f"エラー: テンプレートファイルが見つかりません: {TEMPLATE_FILE}")
+        return
+    templates = load_templates()
 
     roi = load_or_select_roi(image_files)
     if roi is None:
@@ -134,7 +182,7 @@ def main():
     warning_count = 0
     for image_path in image_files:
         image_name = os.path.basename(image_path)
-        text = ocr_image(image_path, roi)
+        text = ocr_image(image_path, roi, templates)
         if text is None:
             continue
         lines = [line.strip() for line in text.splitlines() if line.strip()]
