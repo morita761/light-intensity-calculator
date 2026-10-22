@@ -5,6 +5,7 @@
   1. R, G, B すべてが WHITE_THRESHOLD より明るい画素 = 白文字 として取り出す
      （緑の蛍光・水色/青/マゼンタの馬蹄形の線は、どれかのチャンネルが暗いので除外される）
   2. 白い塊のうち、高さ・幅が数字1文字らしいものだけを残す
+     スケールバー（横長の白い棒）があれば、その周囲の数字（'10 µm' の '10' など）は番号ではないので除く
   3. 横に並んでいる数字（'1' と '0' など）をまとめて1つの番号にする
   4. 番号ごとに Tesseract で読み取る
   5. 番号の中心座標と外接矩形をCSVに出力し、確認用に枠と読み取り結果を描いた画像も保存する
@@ -28,6 +29,12 @@ ROI = None                               # 探す範囲 [x, y, w, h]。None な�
 
 WHITE_THRESHOLD = 150                    # R, G, B すべてがこの値より明るい画素を白文字とみなす
 DIGIT_HEIGHT = (20, 50)                  # 数字1文字の高さ（px）の範囲。画像の解像度が変わったら合わせる
+# スケールバーの除外: 幅が SCALE_BAR_MIN_WIDTH 以上で、高さの SCALE_BAR_MIN_ASPECT 倍以上横長の白い塊をスケールバーとみなし、
+# そこから左右 SCALE_BAR_MARGIN[0], 上下 SCALE_BAR_MARGIN[1] (px) の範囲にかかる数字を除外する
+# （スクショ下端のホームバーもスケールバー扱いになるが、近くに番号がなければ影響はない）
+SCALE_BAR_MIN_WIDTH = 100
+SCALE_BAR_MIN_ASPECT = 5
+SCALE_BAR_MARGIN = (50, 120)
 GROUP_Y_TOL = 0.3                        # 同じ番号とみなす数字の上端のずれ（文字の高さに対する割合）
 GROUP_X_GAP = 0.6                        # 同じ番号とみなす数字の間隔の上限（文字の高さに対する割合）
 OCR_PAD = 20                             # Tesseract に渡すときの余白（px）。狭いと1文字の数字が読めないことがある
@@ -39,15 +46,30 @@ TESSERACT_WHITELIST = '0123456789'
 
 
 def find_digits(mask):
-    """ 数字1文字らしい白い塊を [(x, y, w, h, ラベル番号), ...] で返す """
+    """
+    数字1文字らしい白い塊を [(x, y, w, h, ラベル番号), ...] で返す。
+    スケールバーの周囲の数字は除き、除外範囲 [(x0, y0, x1, y1), ...] も返す。
+    """
     n, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
-    digits = []
+    digits, exclude = [], []
     for i in range(1, n):
         x, y, w, h, _ = stats[i]
+        if w >= SCALE_BAR_MIN_WIDTH and w >= h * SCALE_BAR_MIN_ASPECT:
+            mx, my = SCALE_BAR_MARGIN
+            exclude.append((x - mx, y - my, x + w + mx, y + h + my))
         # 高さが範囲内で、横長でないもの（ホームバーなどの横線を除く）
-        if DIGIT_HEIGHT[0] <= h <= DIGIT_HEIGHT[1] and w < h:
+        elif DIGIT_HEIGHT[0] <= h <= DIGIT_HEIGHT[1] and w < h:
             digits.append((x, y, w, h, i))
-    return digits, labels
+
+    def in_exclude(d):
+        x, y, w, h, _ = d
+        return any(x < x1 and x + w > x0 and y < y1 and y + h > y0 for x0, y0, x1, y1 in exclude)
+
+    excluded = [d for d in digits if in_exclude(d)]
+    if excluded:
+        print(f"ℹ️ スケールバーの周囲にある {len(excluded)}文字を番号から除外しました: "
+              + ', '.join(f'({x + w / 2:.0f}, {y + h / 2:.0f})' for x, y, w, h, _ in excluded))
+    return [d for d in digits if not in_exclude(d)], labels, exclude
 
 
 def group_digits(digits):
@@ -107,7 +129,7 @@ def extract_label_coords(input_image, output_csv, output_image):
         roi_mask[ry:ry + rh, rx:rx + rw] = 1
         mask *= roi_mask
 
-    digits, labels = find_digits(mask)
+    digits, labels, exclude = find_digits(mask)
     groups = group_digits(digits)
     print(f"🔍 数字 {len(digits)}文字 → 番号 {len(groups)}個 を検出しました。")
 
@@ -144,6 +166,9 @@ def extract_label_coords(input_image, output_csv, output_image):
 
     # 確認用画像: 検出枠（黄）と読み取った番号（読めなかったものは赤で '?'）
     check = img.copy()
+    # スケールバーの除外範囲（灰色）
+    for x0, y0, x1, y1 in exclude:
+        cv2.rectangle(check, (int(x0), int(y0)), (int(x1), int(y1)), (160, 160, 160), 2)
     for r in results:
         x, y, w, h = r['bbox']
         ok = r['text'].isdigit()
