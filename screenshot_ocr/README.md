@@ -12,6 +12,7 @@ Photoshop のヒストグラムパネル（平均 / 標準偏差 / 中間値 / �
 | 2 | `ocr_screenshots.py` | 1枚目で範囲を選択（`ocr_roi-<NAME>.json` に保存して全画像に適用）し、テンプレート照合で数値を読み取って `ocr_result-<NAME>.csv` に出力 |
 | 3 | `ocr_to_vd_csv.py` | `NAMES` に並べた画像セットの OCR 結果を、1測定1行の `vd_intensity.csv` にまとめる |
 | - | `compare_ocr_vs_re.py` | OCR の平均値と Photoshop の計測ログ（`<NAME>_grayvalue_RE.txt`）を比較プロット |
+| - | `extract_label_coords.py` | 画像に白文字で書き込まれた番号（測定番号）を検出して読み取り、番号ごとの中心座標・外接矩形を `label_coords.csv` に出力（確認用に `label_coords_check.png` も保存） |
 
 ## 補足
 
