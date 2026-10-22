@@ -10,12 +10,12 @@ Photoshop のヒストグラムパネル（平均 / 標準偏差 / 中間値 / �
 |---|---------|------|
 | 1 | `rename_screenshots.py` | スクリーンショットを撮影日時順に2枚一組で `1-V`, `1-D`, `2-V`, ... にリネームし、`rename-<NAME>/` にコピー |
 | 2 | `ocr_screenshots.py` | 1枚目で範囲を選択（`ocr_roi-<NAME>.json` に保存して全画像に適用）し、テンプレート照合で数値を読み取って `ocr_result-<NAME>.csv` に出力 |
-| 3 | `ocr_to_vd_csv.py` | `NAMES` に並べた画像セットの OCR 結果を、1測定1行の `vd_intensity.csv` にまとめる |
+| 3 | `ocr_to_vd_csv.py` | `NAMES` に並べた画像セットの OCR 結果を、1測定1行の `vd_intensity.csv` にまとめる。`position` は番号を書き込んだ写真 `label-<NAME>.png` の番号の x 座標を3等分して決める（座標は `label_coords-<NAME>.csv` に保存して再利用） |
 | - | `compare_ocr_vs_re.py` | OCR の平均値と Photoshop の計測ログ（`<NAME>_grayvalue_RE.txt`）を比較プロット |
-| - | `extract_label_coords.py` | 画像に白文字で書き込まれた番号（測定番号）を検出して読み取り、番号ごとの中心座標・外接矩形を `label_coords.csv` に出力（確認用に `label_coords_check.png` も保存） |
+| - | `extract_label_coords.py` | （`ocr_to_vd_csv.py` から呼ばれる。単体でも実行可）画像に白文字で書き込まれた番号（測定番号）を検出して読み取り、番号ごとの中心座標・外接矩形を `label_coords.csv` に出力（確認用に `label_coords_check.png` も保存） |
 
 ## 補足
 
 - `ocr_templates.json` に数字の2値パターンを持つ。Photoshop の文字サイズ変更前（`small_8px`）と変更後（`large_9px`）の両方に対応し、行の高さで自動的に使い分ける。
 - テンプレートにない形は `?` になり警告が出る（Tesseract はこのフォントの 5 を `$` や 3 と誤認識するため使っていない）。
-- `vd_intensity.csv` の `individual_id` / `flipped` / `position` は仮の値なので手動で確認する（詳細は `ocr_to_vd_csv.py` 冒頭）。
+- `vd_intensity.csv` の `individual_id` / `flipped` は仮の値、`position` は写真の番号の位置から機械的に決めた値なので手動で確認する（詳細は `ocr_to_vd_csv.py` 冒頭）。

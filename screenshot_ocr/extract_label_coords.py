@@ -11,6 +11,8 @@
 
 座標は入力画像のピクセル座標（左上が原点, x は右向き, y は下向き）。
 スクリーンショットを入力にした場合はスクショ上の座標なので、元の顕微鏡画像の座標とは拡大率・位置がずれる。
+
+単体で実行すると INPUT_IMAGE を処理する。ocr_to_vd_csv.py からは extract_label_coords() / load_label_coords() を使う。
 """
 import csv
 from collections import Counter
@@ -87,11 +89,15 @@ def read_number(group, labels):
     return text, (x0, y0, x1 - x0, y1 - y0)
 
 
-def main():
-    img = cv2.imread(INPUT_IMAGE)
+def extract_label_coords(input_image, output_csv, output_image):
+    """
+    input_image から番号を検出して output_csv に座標を書き、output_image に確認用画像を保存する。
+    成功したら True を返す。
+    """
+    img = cv2.imread(input_image)
     if img is None:
-        print(f"エラー: 画像が読み込めません: {INPUT_IMAGE}")
-        return
+        print(f"エラー: 画像が読み込めません: {input_image}")
+        return False
 
     # ROI の外は探さない（座標は画像全体の座標のまま扱う）
     mask = (img.min(axis=2) > WHITE_THRESHOLD).astype(np.uint8)
@@ -129,12 +135,12 @@ def main():
     results.sort(key=lambda r: (not r['text'].isdigit(), int(r['text']) if r['text'].isdigit() else 0))
 
     # utf-8-sig: Excelで開いたときに文字化けしないようにする
-    with open(OUTPUT_CSV, 'w', newline='', encoding='utf-8-sig') as f:
+    with open(output_csv, 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f)
         writer.writerow(['number', 'x', 'y', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h'])
         for r in results:
             writer.writerow([r['text'], f"{r['x']:.1f}", f"{r['y']:.1f}", *r['bbox']])
-    print(f"✅ {len(results)}個の番号の座標を {OUTPUT_CSV} に出力しました。")
+    print(f"✅ {len(results)}個の番号の座標を {output_csv} に出力しました。")
 
     # 確認用画像: 検出枠（黄）と読み取った番号（読めなかったものは赤で '?'）
     check = img.copy()
@@ -144,9 +150,22 @@ def main():
         color = (0, 255, 255) if ok else (0, 0, 255)
         cv2.rectangle(check, (x - 3, y - 3), (x + w + 3, y + h + 3), color, 2)
         cv2.putText(check, r['text'] if ok else '?', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.0, color, 2)
-    cv2.imwrite(OUTPUT_IMAGE, check)
-    print(f"   確認用画像を {OUTPUT_IMAGE} に保存しました。")
+    cv2.imwrite(output_image, check)
+    print(f"   確認用画像を {output_image} に保存しました。")
+    return True
+
+
+def load_label_coords(path):
+    """ extract_label_coords() の出力CSVを読み、{番号: (x, y)} を返す（番号が読めていない行は除く） """
+    coords = {}
+    with open(path, 'r', encoding='utf-8-sig') as f:
+        for r in csv.DictReader(f):
+            if r['number'].isdigit():
+                coords[int(r['number'])] = (float(r['x']), float(r['y']))
+    return coords
 
 
 # --- 実行部分 ---
-main()
+# ocr_to_vd_csv.py から import したときは実行しない
+if __name__ == '__main__':
+    extract_label_coords(INPUT_IMAGE, OUTPUT_CSV, OUTPUT_IMAGE)
