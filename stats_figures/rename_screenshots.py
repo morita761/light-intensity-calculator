@@ -4,10 +4,11 @@ import shutil
 from datetime import datetime
 
 # --- 設定（ハードコード） ---
-INPUT_DIR = 'screenshots'           # スクリーンショットが入っているフォルダ
-OUTPUT_DIR = 'screenshots_renamed'  # リネーム後のコピー先フォルダ（元ファイルは変更しない）
+NAME = '20241024_controlFz003'
+INPUT_DIR = '../../'+NAME           # スクリーンショットが入っているフォルダ
+OUTPUT_DIR = 'rename-'+NAME  # リネーム後のコピー先フォルダ（元ファイルは変更しない）
 START_NUMBER = 1                    # 開始番号（例: 5 にすると 5-R, 5-L, 6-R, ... ）
-SIDES = ['R', 'L']                  # 2枚一組の並び順（1枚目がR、2枚目がL）
+SIDES = ['V', 'D']                  # 2枚一組の並び順（1枚目がR、2枚目がL）
 
 # ファイル名中の日時パターン
 # 例: "スクリーンショット 2026-10-21 9.05.03.png" (macOS), "Screenshot 2026-10-21 090503.png"
