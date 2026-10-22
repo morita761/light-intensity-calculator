@@ -31,9 +31,10 @@ ocr_screenshots.py の出力 (ocr_result-<NAME>.csv) から、V-D分岐の輝度
 
 その他の確認事項:
   - OCR で読めなかった値（ocr_result の warning 列に何か入っている値）や、V/D の片方しかない測定は空欄にして警告を出す。
-  - 範囲のずれで行が欠けたり増えたりすると別の値を読んでしまうので、1枚の行数が EXPECTED_LINES でない画像と、
-    平均が小数・中間値が整数の形になっていない値も空欄にして警告を出す。
+  - 平均が小数・中間値が整数の形になっていない値も、範囲のずれで別の行を読んでいる可能性があるので空欄にして警告を出す。
     元のスクショを見て手入力すること。
+  - 1枚の行数が EXPECTED_LINES でない画像は警告だけ出し、値はそのまま使う
+    （ツールチップで下の行が隠れただけのことが多いため）。警告が出た画像は元のスクショで値を確認すること。
 """
 import os
 import re
@@ -100,8 +101,7 @@ def get_value(data, name, no, branch, line_no):
         return ''
     if len(lines) != EXPECTED_LINES:
         print(f"⚠️ 警告: {name} {no}-{branch}.png の行数が {len(lines)}行です（{EXPECTED_LINES}行のはず）。"
-              f"範囲がずれている可能性があるため {line_no}行目を空欄にします")
-        return ''
+              f"{line_no}行目の値はそのまま使うので、元のスクショで確認してください")
     text, warning = lines[line_no]
     if warning:
         print(f"⚠️ 警告: {name} {no}-{branch}.png の {line_no}行目が OCR で読めていません: {text}（空欄にします）")
