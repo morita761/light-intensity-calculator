@@ -28,6 +28,8 @@ ocr_screenshots.py の出力 (ocr_result-<NAME>.csv) から、V-D分岐の輝度
 
 その他の確認事項:
   - OCR で読めなかった値（ocr_result の warning 列に何か入っている値）や、V/D の片方しかない測定は空欄にして警告を出す。
+  - 範囲のずれで行が欠けたり増えたりすると別の値を読んでしまうので、1枚の行数が EXPECTED_LINES でない画像と、
+    平均が小数・中間値が整数の形になっていない値も空欄にして警告を出す。
     元のスクショを見て手入力すること。
 """
 import os
@@ -45,6 +47,12 @@ OUTPUT_CSV = 'vd_intensity.csv'
 
 MEAN_LINE = 1                          # 平均値が書かれている行（スクショ内の何行目か）
 MEDIAN_LINE = 3                        # 中間値が書かれている行
+EXPECTED_LINES = 4                     # 1枚あたりの行数（平均 / 標準偏差 / 中間値 / 全ピクセル）
+# 値の形のチェック（行がずれて標準偏差や全ピクセルを読んでいないかの確認）
+VALUE_PATTERNS = {
+    MEAN_LINE: re.compile(r'^\d+\.\d+$'),    # 平均は小数
+    MEDIAN_LINE: re.compile(r'^\d+$'),        # 中間値は整数
+}
 DEFAULT_FLIPPED = 'No'                 # 左右反転の初期値（手動で確認して Yes に直す）
 POSITIONS = ['Ventral', 'Middle', 'Dorsal']  # 組織内での位置の区分（測定番号の若い方から順に割り当てる）
 
@@ -79,9 +87,17 @@ def get_value(data, name, no, branch, line_no):
     if line_no not in lines:
         print(f"⚠️ 警告: {name} {no}-{branch}.png に {line_no}行目がありません（空欄にします）")
         return ''
+    if len(lines) != EXPECTED_LINES:
+        print(f"⚠️ 警告: {name} {no}-{branch}.png の行数が {len(lines)}行です（{EXPECTED_LINES}行のはず）。"
+              f"範囲がずれている可能性があるため {line_no}行目を空欄にします")
+        return ''
     text, warning = lines[line_no]
     if warning:
         print(f"⚠️ 警告: {name} {no}-{branch}.png の {line_no}行目が OCR で読めていません: {text}（空欄にします）")
+        return ''
+    pattern = VALUE_PATTERNS.get(line_no)
+    if pattern and not pattern.match(text):
+        print(f"⚠️ 警告: {name} {no}-{branch}.png の {line_no}行目の形が想定と違います: {text}（空欄にします）")
         return ''
     return text
 

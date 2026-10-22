@@ -32,9 +32,17 @@ def load_re_log(path):
 
 
 def load_ocr_mean(path):
-    """ {'12-V.png': 平均値, ...} を返す """
+    """ {'12-V.png': 平均値, ...} を返す。OCR で読めなかった値（warning 列に何か入っている行）は警告を出して除く """
+    result = {}
     with open(path, 'r', encoding='utf-8-sig') as f:
-        return {r['image']: float(r['text']) for r in csv.DictReader(f) if int(r['line']) == MEAN_LINE}
+        for r in csv.DictReader(f):
+            if int(r['line']) != MEAN_LINE:
+                continue
+            if r['warning']:
+                print(f"⚠️ 警告: {r['image']} の平均値が OCR で読めていないため除外します: {r['text']}")
+                continue
+            result[r['image']] = float(r['text'])
+    return result
 
 
 def main():

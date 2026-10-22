@@ -10,7 +10,7 @@ NAME = '241106_Fz_control003'
 INPUT_DIR = 'rename-'+NAME   # PNGが入っているフォルダ
 ROI_FILE = 'ocr_roi-'+NAME+'.json'  # 選択した範囲の保存先（画像セットごとに保存し、次回以降はこれを再利用）
 OUTPUT_CSV = 'ocr_result-'+NAME+'.csv'  # 抽出結果の出力先（ocr_to_vd_csv.py がこの名前で読み込む）
-RESELECT_ROI = True                # True にすると保存済みの範囲を無視して選び直す
+RESELECT_ROI = False               # True にすると保存済みの範囲を無視して選び直す
 CROP_DIR = 'ocr_crops-'+NAME             # OCRに渡した前処理後の画像の保存先（確認用、Noneで保存しない）
 
 # 文字認識設定（テンプレート照合）
