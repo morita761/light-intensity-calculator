@@ -3,6 +3,8 @@
 **/output/
 */pic/
 */pics/
+*pic/
+*.png
 *.tif
 .o
 
