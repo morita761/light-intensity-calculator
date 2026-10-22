@@ -6,9 +6,9 @@ import cv2
 import numpy as np
 
 # --- 設定（ハードコード） ---
-NAME = '20241024_controlFz003'
+NAME = '241106_Fz_control003'
 INPUT_DIR = 'rename-'+NAME   # PNGが入っているフォルダ
-ROI_FILE = 'ocr_roi.json'           # 選択した範囲の保存先（次回以降はこれを再利用）
+ROI_FILE = 'ocr_roi-'+NAME+'.json'  # 選択した範囲の保存先（画像セットごとに保存し、次回以降はこれを再利用）
 OUTPUT_CSV = 'ocr_result-'+NAME+'.csv'  # 抽出結果の出力先（ocr_to_vd_csv.py がこの名前で読み込む）
 RESELECT_ROI = True                # True にすると保存済みの範囲を無視して選び直す
 CROP_DIR = 'ocr_crops-'+NAME             # OCRに渡した前処理後の画像の保存先（確認用、Noneで保存しない）
@@ -16,8 +16,11 @@ CROP_DIR = 'ocr_crops-'+NAME             # OCRに渡した前処理後の画像�
 # 文字認識設定（テンプレート照合）
 # 画面の文字はスクショごとにピクセル単位で同じ形なので、Tesseractではなく文字の形をテンプレートと完全一致で照合する
 # （Tesseractはこのドットフォントの 5 を $ や 3 と誤認識するため使わない）
-# テンプレートにない形は '?' になり警告が出る。画面の拡大率やフォントが変わったらテンプレートを作り直す必要がある
-TEMPLATE_FILE = 'ocr_templates.json'  # 文字ごとの2値パターン（'#'=文字, '.'=背景）
+# テンプレートにない形は '?' になり警告が出る。画面の拡大率やフォントが変わったらテンプレートを追加する必要がある
+# Photoshop の文字サイズ違いに対応するため、フォントごとにテンプレートを持つ（行の高さで自動的に使い分ける）
+#   small_8px: 文字サイズ変更前（20241024_controlFz003 など）
+#   large_9px: 文字サイズを大きくした後（241106_Fz_control003 以降、基本はこちら）
+TEMPLATE_FILE = 'ocr_templates.json'  # {フォント名: {文字: 2値パターン（'#'=文字, '.'=背景）}}
 TEXT_THRESHOLD = 150                # この輝度より明るい画素を文字とみなす（背景 約80, 文字 最大 約210）
 CROP_SCALE = 8                      # 確認用画像の拡大倍率
 DISPLAY_MAX = 1400                  # 範囲選択ウィンドウの最大表示サイズ（px）
@@ -75,11 +78,15 @@ def load_or_select_roi(image_files):
 
 
 def load_templates():
-    """ {文字: 2値配列} を返す。幅の広いものから照合するよう並べる """
+    """
+    [(文字, 2値配列), ...] を返す。幅の広いものから照合するよう並べる
+    全フォントのテンプレートをまとめて返す（read_line で行の高さが同じものだけが照合されるので混ざらない）
+    """
     with open(TEMPLATE_FILE, 'r', encoding='utf-8') as f:
-        raw = json.load(f)
-    templates = {ch: np.array([[c == '#' for c in row] for row in rows]) for ch, rows in raw.items()}
-    return sorted(templates.items(), key=lambda t: t[1].shape[1], reverse=True)
+        fonts = json.load(f)
+    templates = [(ch, np.array([[c == '#' for c in row] for row in rows]))
+                 for glyphs in fonts.values() for ch, rows in glyphs.items()]
+    return sorted(templates, key=lambda t: t[1].shape[1], reverse=True)
 
 
 def find_runs(mask):

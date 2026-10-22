@@ -4,8 +4,8 @@ import shutil
 from datetime import datetime
 
 # --- 設定（ハードコード） ---
-NAME = '20241024_controlFz003'
-INPUT_DIR = '../../'+NAME           # スクリーンショットが入っているフォルダ
+NAME = '241106_Fz_control003'
+INPUT_DIR = '../../control-snapshot/'+NAME           # スクリーンショットが入っているフォルダ
 OUTPUT_DIR = 'rename-'+NAME  # リネーム後のコピー先フォルダ（元ファイルは変更しない）
 START_NUMBER = 1                    # 開始番号（例: 5 にすると 5-R, 5-L, 6-R, ... ）
 SIDES = ['V', 'D']                  # 2枚一組の並び順（1枚目がR、2枚目がL）

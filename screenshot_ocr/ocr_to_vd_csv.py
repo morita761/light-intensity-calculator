@@ -38,6 +38,7 @@ import csv
 # 読み込む画像セット名（ocr_screenshots.py の NAME）。複数並べると上から順に連結する
 NAMES = [
     '20241024_controlFz003',
+    '241106_Fz_control003',
 ]
 INPUT_TEMPLATE = 'ocr_result-{}.csv'   # NAME から入力ファイル名を作る
 OUTPUT_CSV = 'vd_intensity.csv'
