@@ -11,6 +11,7 @@ ImageJ で crop したときに左右反転させた画像。`flipped` を `Yes`
 |---|---|---|
 | 241106_Fz_control003 | Yes | |
 | 20260918_22h_mosaic_fz_Fz-GFP_GRM-splitGFP1-10_ue | Yes | 同じ個体の _sita に向きを合わせるため反転 |
+| 20250423_24%APF_Fz-GFP_RFP_sita | Yes | 同じ個体の _ue に対して反転（マスク名に `_flip` が付いている） |
 
 上の表にない画像セットは反転していない（`No`）。
 
@@ -21,6 +22,7 @@ ImageJ で crop したときに左右反転させた画像。`flipped` を `Yes`
 | 個体 | 画像セット |
 |---|---|
 | 20260918 mosaic fz Fz | 20260918_22h_mosaic_fz_Fz-GFP_GRM-splitGFP1-10_sita, 20260918_22h_mosaic_fz_Fz-GFP_GRM-splitGFP1-10_ue |
+| 20250423 mosaic control | 20250423_24%APF_Fz-GFP_RFP_ue, 20250423_24%APF_Fz-GFP_RFP_sita |
 
 ## スクショの撮り直し・追加
 
