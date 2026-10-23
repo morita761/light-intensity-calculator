@@ -24,3 +24,8 @@ __pycache__/
 
 # Cellpose: dataset_prepare_from_coco.py で生成される中間データセット
 Cellpose/cellpose_dataset/
+
+# screenshot_ocr: スクショのコピー・OCR確認用画像・比較プロット（画像セットごとに生成される）
+screenshot_ocr/rename-*/
+screenshot_ocr/ocr_crops-*/
+screenshot_ocr/*.png
