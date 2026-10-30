@@ -1,0 +1,49 @@
+# ==========================================================================
+# 画像セットの定義（arrow_analysis/ の全スクリプト共通）
+#
+# 書式は heatmap/config/image_sets.txt と同じ:
+#   label  : グラフに表示する名前
+#   dir    : image_root からのフォルダ
+#   images : 1行に1組。「元画像 | マスク」（マスク省略時は 元画像名 + mask_suffix）
+#
+# 画像は arrow_analysis/pics/ に置く（git管理外）。
+# ==========================================================================
+
+[common]
+image_root = pics
+mask_suffix = _mask.tif
+
+[R8control]
+label = Control
+dir = R8control
+images =
+    Projections of 20251105_25degree_24hours_senslexAlexOP_loco_cas9_contorl.nd2...5degree_24hours_senslexAlexOP_loco_cas9_contorl_r_image.png
+    Projections of 20251119_25d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi.nd2...5d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi_h.png
+    Projections of 20251119_25d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi.nd2...5d_22h_senslexAlexOPmCherry_loco--cas9_x_sgRNAi_r_h.png
+
+[R8ori]
+label = vang Cas9
+dir = R8ori
+images =
+    Projections of 20251105_25degree_24hours_senslexAlexOP_loco_vang_cas9001.nd2...5degree_24hours_senslexAlexOP_loco_vang_cas9001.png
+    Projections of 20251119_25d_22h_senslexAlexOPmCherry_loco--vang-cas9002.nd2-...25d_22h_senslexAlexOPmCherry_loco--vang-cas9002.png
+    Projections of 20251129_25d_22h_senslexAlexOPmCherry_loco_vang_cas9.nd2-20251129_25d_22h_senslexAlexOPmCherry_loco_vang_cas9.png
+    Projections of 20251129_25d_22h_test_sensmCherry_loco_vang_cas9001.nd2-20251129_25d_22h_test_sensmCherry_loco_vang_cas9001.png
+
+[29d_R8control]
+label = Control (29℃)
+dir = 29d_R8control
+images =
+    Projections of 20251022_29degree_20h_senslexAlexOPmCherry_Cas9_no_sgRNA.png
+
+[29d_R8ori]
+label = vang Cas9 (29℃)
+dir = 29d_R8ori
+images =
+    Projections of 20251014_29degree_21hours_loco-Cas9-vang_R8_mCherry.png
+
+[mosaic_Fz2]
+label = Fz2 mosaic
+dir = mosaic_Fz2_control_fz2_Fz2
+images =
+    Projections of 20250413_24%APF_Fz2-GFP_fz2-RNAi_001_ue.tif | Projections of 20250413_24%APF_Fz2-GFP_fz2-RNAi_001_ue_merge_mask.png

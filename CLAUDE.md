@@ -33,13 +33,13 @@ light-intensity-calculator/
 │   ├── dataset_prepare_from_coco.py # 既存COCOアノテーションの変換
 │   ├── train_finetune.py # fine-tuningスクリプト
 │   └── func/              # V-D分割・輝度計算
-├── horseShoeShapeRecog/  # OpenCVによる従来手法（実験）
-├── heatmap/              # ヒートマップ可視化
-├── stats_figures/        # 統計グラフ（箱ひげ図等）
-├── histogram/            # ヒストグラム処理テスト
-├── gradient/             # グラデーション処理テスト
-├── circle_detection/     # 円検出テスト
-├── arrow_analysis/       # 矢印検出・極座標ヒストグラム
+├── horseShoeShapeRecog/  # OpenCVによる従来手法（実験、main.py/horseshoe.pyからimportされる）
+├── stats_figures/        # 統計グラフ（箱ひげ図・バイオリン図・ANOVA）
+├── heatmap/              # 馬蹄形の平均輝度ヒートマップ
+├── arrow_analysis/       # 馬蹄形の向き・極座標ヒストグラム・2群t検定
+├── gradient/             # 長方形領域の輝度グラディエント
+├── histogram/            # 明度ヒストグラム・CLAHEの確認
+├── shared/               # 解析フォルダ共通モジュール（設定txt・図の保存・馬蹄形抽出）
 ├── pic/                  # テンプレート画像
 ├── archive/              # 過去の実験コード（Keras/PyTorch U-Net）
 └── ルートファイル         # 従来手法のメインスクリプト
@@ -61,10 +61,17 @@ light-intensity-calculator/
 - `**/train_finetune.py` - 変換済みデータでのCLI fine-tuning（loss履歴CSV・TensorBoardログ出力付き）
 - `**/launch_gui.py` - Cellpose GUI起動（human-in-the-loop fine-tuning用、実行・検証はユーザー側）
 
-### 可視化・統計（stats_figures/, heatmap/, arrow_analysis/）
-- `**/boxplot_vd.py` - V-D分岐の箱ひげ図比較（t検定付き）
-- `**/mosaic_horseshoe.py` - モザイク実験用ヒートマップ
-- `**/orientation-polar-histogram.py` - 極座標ヒストグラム
+### 解析・作図フォルダ（stats_figures/, heatmap/, arrow_analysis/, gradient/, histogram/）
+全フォルダ共通の構成: `config/figure_settings.txt`（軸・タイトル・解析パラメータ）、`config/image_sets.txt`（画像一覧）、
+`output/<スクリプト名>/`（出力、git管理外）、`lib/`（フォルダ内共通処理。`lib/__init__.py` がリポジトリ直下を sys.path に追加し `shared/` を使う）。
+全作図スクリプトは `-h`（docstringに用途・入出力・Usage）、`--no-text` / `--both` / `--no-show` に対応。新しいスクリプトもこの形式に合わせること。
+- `**/shared/figure.py` - 図の保存・文字無し版（同じbboxで切り出し）・共通引数
+- `**/shared/horseshoe.py` - マスク画像の色→輪郭→左右分類、画像セット（image_sets.txt）の読み込み
+- `**/parse_intensity.py` - 輝度テキスト→ノーマライズ済みCSV（stats_figuresの前処理）
+- `**/violin_plot.py` / `**/twoway_anova.py` - |L-R|の比較・Two-way ANOVA
+- `**/horseshoe_heatmap.py` / `**/group_heatmap.py` / `**/mosaic_compare.py` - 平均輝度ヒートマップ
+- `**/orientation_polar.py` / `**/group_comparison_ttest.py` - 馬蹄形の向き
+- `**/plot_gradient.py` - 輝度グラディエント
 
 ### ルートレベル
 - `**/gptFunc.py` - 緑色抽出・左右分割の共通関数
@@ -93,6 +100,6 @@ python Detectron2/inference_heatmaps.py
 
 ## 注意事項
 
-- `archive/` フォルダは過去の実験コードであり、現在は使用されていない
+- `archive/` フォルダと各フォルダの `legacy/` は過去の実験コードであり、現在は使用されていない
 - メインの処理パイプラインは `Detectron2/` フォルダにある
 - 新しい機能追加時は既存のコーディングスタイルに従うこと

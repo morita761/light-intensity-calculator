@@ -1,0 +1,71 @@
+# ==========================================================================
+# 図と解析パラメータの設定（arrow_analysis/）
+#
+# [セクション名] = スクリプト名。[common] は全スクリプト共通の既定値。
+# 書式は stats_figures/config/figure_settings.txt と同じ。
+# タイトル中の {label} は画像セットの label、{n} は馬蹄形の個数に置き換わる。
+# 文字無し版は --no-text / --both で出力（ここの設定は変えなくてよい）
+# ==========================================================================
+
+[common]
+dpi = 300
+format = png
+title_fontsize = 12
+label_fontsize = 11
+tick_fontsize = 10
+annotated_title = Annotated {i}
+annotated_title_fontsize = 10
+
+# --- 向きの推定パラメータ ---
+# skeleton（骨格化）または moment（重心 → バウンディングボックス中心）
+method = skeleton
+# 中心線から何px以内の馬蹄形を除外するか（--center-margin で上書き可）
+center_margin = 80
+min_area = 20
+annotation_colors = blue, cyan, magenta
+# アノテーションの塗りの膨張（見た目だけで角度には影響しない）
+dilate_occupancy = 0.3
+max_dilate = 2
+# アノテーションの矢印の長さ倍率
+arrow_scale = 2.5
+
+# --- 極座標ヒストグラム ---
+# ビンの幅（度）
+bin_width_deg = 10
+bar_alpha = 0.6
+theta_labels = 0°, 90°, 180°, -90°
+rlabel_position = 135
+
+
+# --------------------------------------------------------------------------
+# orientation_polar.py : 1セットの向きの分布
+# --------------------------------------------------------------------------
+[orientation_polar]
+default_set = R8control
+figsize = 12, 4
+ventral_title = Ventral (n={n})
+dorsal_title = Dorsal (n={n})
+ventral_color = magenta
+dorsal_color = blue
+# --debug-rois / --debug-skeleton の図のタイトル（{n} は何枚目か）
+rois_title = Individual Horseshoe Debug Plots (Set {n})
+skeletons_title = Skeleton Debug Plots (Set {n})
+
+
+# --------------------------------------------------------------------------
+# group_comparison_ttest.py : 2群の t検定
+# --------------------------------------------------------------------------
+[group_comparison_ttest]
+control_set = R8control
+test_set = R8ori
+figsize = 14, 10
+bar_alpha = 0.5
+group_colors = blue, red
+box_colors = lightblue, lightcoral
+box_ylabel = Orientation Angle (°)
+box_ylim = -180, 220
+# 有意差ブラケットの高さ
+bracket_y = 120
+bracket_height = 5
+star_fontsize = 14
+polar_title = {side} - Polar Histogram

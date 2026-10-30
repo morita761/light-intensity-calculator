@@ -1,0 +1,101 @@
+# ==========================================================================
+# 図と解析パラメータの設定（heatmap/）
+#
+# [セクション名] = スクリプト名。[common] は全スクリプト共通の既定値。
+# 書式は stats_figures/config/figure_settings.txt と同じ:
+#   文字列 title = ...（\n で改行）/ 数値 / 組 figsize = 12, 4 / ylim = auto
+# タイトル中の {label} は画像セットの label に置き換わる。
+# 文字無し版は --no-text / --both で出力（ここの設定は変えなくてよい）
+# ==========================================================================
+
+[common]
+dpi = 300
+format = png
+title_fontsize = 12
+label_fontsize = 11
+tick_fontsize = 10
+annotated_title = Annotated {i}
+annotated_title_fontsize = 10
+
+# ヒートマップの色
+cmap = viridis
+vmin = 0
+vmax = 255
+colorbar_label = Normalized Average GFP Intensity
+
+# --- ROI抽出パラメータ ---
+# 馬蹄形をこのサイズ（幅, 高さ）にそろえて平均する
+target_size = 100, 100
+# この面積(px)未満の輪郭はノイズとして無視
+min_area = 20
+# マスクの塗り色（blue, cyan, magenta, red から選ぶ）
+annotation_colors = blue, cyan, magenta
+# 中心線から何px以内の馬蹄形を除外するか（--center-margin で上書き可）
+center_margin = 10
+# 膨張: バウンディングボックス内の占有率がこの値を超えるまで膨らませる（0 なら膨張しない）
+dilate_occupancy = 0.6
+# 膨張がこの回数を超えた（細すぎる）馬蹄形は除外
+max_dilate = 2
+# 明るさ補正後に 0-255 で切り捨てる（false なら小数のまま平均）
+clip_uint8 = true
+
+
+# --------------------------------------------------------------------------
+# horseshoe_heatmap.py : 1セットの平均ヒートマップ（左右それぞれ最小〜最大を0〜255に）
+# --------------------------------------------------------------------------
+[horseshoe_heatmap]
+default_set = vang_cas9
+trim = 0
+overview_figsize = 12, 4
+single_figsize = 5, 4
+ventral_title = Average GFP Intensity Heatmap\n(Ventral Horseshoes)
+dorsal_title = Average GFP Intensity Heatmap\n(Dorsal Horseshoes)
+# --overlay-rfp の時の塗りの不透明度
+overlay_alpha = 0.4
+# --histogram
+histogram_figsize = 10, 5
+histogram_bins = 50
+histogram_ventral_title = Normalized GFP Intensity Distribution (Ventral)
+histogram_dorsal_title = Normalized GFP Intensity Distribution (Dorsal)
+histogram_xlabel = Intensity Value (0-255)
+histogram_ylabel = Frequency
+
+
+# --------------------------------------------------------------------------
+# group_heatmap.py : 複数系統を共通スケールで比較
+# --------------------------------------------------------------------------
+[group_heatmap]
+groups = control, vang_rnai, vang_cas9
+# 旧 show-intensity-histgram と同じ抽出条件（中心線±50px除外、膨張なし、小数のまま平均）
+center_margin = 50
+dilate_occupancy = 0
+clip_uint8 = false
+overview_figsize = 12, 4
+ventral_title = {label}\nAverage GFP Intensity Heatmap\n(Ventral)
+dorsal_title = {label}\nAverage GFP Intensity Heatmap\n(Dorsal)
+# ヒストグラム: raw = 全馬蹄形の全画素 / average = 平均ヒートマップの画素
+hist_source = raw
+histogram_figsize = 14, 5
+histogram_bins = 50
+group_colors = blue, green, red, purple, orange
+histogram_ventral_title = Normalized GFP Intensity Distribution (Ventral)
+histogram_dorsal_title = Normalized GFP Intensity Distribution (Dorsal)
+histogram_xlabel = Intensity Value
+histogram_ylabel = Frequency
+
+
+# --------------------------------------------------------------------------
+# mosaic_compare.py : 通常マスク vs RFPマスク
+# --------------------------------------------------------------------------
+[mosaic_compare]
+default_set = mosaic_control
+overlay_alpha = 0.4
+overview_figsize = 16, 4
+grid_figsize = 6, 4
+title_fontsize = 12
+normal_left_title = Normal Mask - Ventral Side
+normal_right_title = Normal Mask - Dorsal Side
+rfp_left_title = RFP Mask - Ventral Side
+rfp_right_title = RFP Mask - Dorsal Side
+# {max} は通常マスクの最大値
+colorbar_label = Normalized Average GFP Intensity (Max = {max:.2f})

@@ -1,71 +1,87 @@
-import pandas as pd
+"""極性の大きさ |L - R| の split violin plot
+
+用途: 左右branchの輝度差の絶対値 |L - R|（= 極性の強さ）が系統間で変わるかを見る。
+      1つのバイオリンの左半分が Ventral R8、右半分が Dorsal R8。
+      赤線は中央値、点線は四分位。先頭の系統（Control）と他の各系統を t検定し、
+      ブラケットとアスタリスクで表示する。
+入力: data/processed/<dataset>/*_v.csv, *_d.csv（parse_intensity.py で生成）
+出力: output/violin_plot/violin_plot_<dataset>.png（文字無し版は *_notext.png）
+
+Usage:
+    python violin_plot.py                          # Control vs Cas9
+    python violin_plot.py --dataset three_groups   # Control / vang RNAi / vang Cas9
+    python violin_plot.py --no-text                # 文字無し版のみ
+    python violin_plot.py --both --no-show         # 通常版+文字無し版を保存、表示しない
+"""
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
 
-# 1. データの読み込み (スペース区切り)
-control_v = pd.read_csv('control_v.csv', sep=' ')
-control_d = pd.read_csv('control_d.csv', sep=' ')
-cas9_v = pd.read_csv('cas9_v.csv', sep=' ')
-cas9_d = pd.read_csv('cas9_d.csv', sep=' ')
+from lib.data_io import abs_diff_long, load_vd
+from lib.figure import finish, make_parser, save_figure
+from lib.settings import load_figure_settings
+from lib.stats_utils import p_to_asterisks
 
-# 2. 絶対値の差を計算して結合する関数
-def get_diff_df(df, genotype, side):
-    diff = (df['left_intensity'] - df['right_intensity']).abs().to_frame(name='abs_diff')
-    diff['genotype'] = genotype
-    diff['side'] = side
-    return diff
+NAME = 'violin_plot'
 
-diff_all = pd.concat([
-    get_diff_df(control_v, 'Control', 'Ventral'),
-    get_diff_df(control_d, 'Control', 'Dorsal'),
-    get_diff_df(cas9_v, 'Cas9', 'Ventral'),
-    get_diff_df(cas9_d, 'Cas9', 'Dorsal')
-])
 
-# 3. 統計計算とアスタリスクの判定
-c_data = diff_all[diff_all['genotype'] == 'Control']['abs_diff']
-k_data = diff_all[diff_all['genotype'] == 'Cas9']['abs_diff']
-_, p_val = stats.ttest_ind(c_data, k_data)
+def main():
+    args = make_parser(__doc__, NAME, dataset_default='two_groups').parse_args()
+    s = load_figure_settings(NAME)
 
-if p_val < 0.0001: asterisks = "****"
-elif p_val < 0.001: asterisks = "***"
-elif p_val < 0.01: asterisks = "**"
-elif p_val < 0.05: asterisks = "*"
-else: asterisks = "n.s."
+    data = load_vd(args.dataset)
+    order = list(data)
+    diff_all = abs_diff_long(data)
 
-# 3. split=True を用いたバイオリンプロットの作成
-plt.figure(figsize=(10, 7))
+    # 統計: 先頭の系統 vs 各系統
+    ref = order[0]
+    ref_data = diff_all[diff_all['genotype'] == ref]['abs_diff']
+    comparisons = []
+    for i, genotype in enumerate(order[1:], start=1):
+        _, p_val = stats.ttest_ind(ref_data, diff_all[diff_all['genotype'] == genotype]['abs_diff'])
+        comparisons.append((i, p_val, p_to_asterisks(p_val)))
+        print(f"{ref} vs {genotype}: P = {p_val:.2e} ({p_to_asterisks(p_val)})")
 
-# hue='side' と split=True を組み合わせる
-ax = sns.violinplot(data=diff_all, x='genotype', y='abs_diff', hue='side',
-               split=True, inner='quartile', palette='Set2', alpha=0.7)
+    default_width = 4 + 3 * len(order)
+    fig, ax = plt.subplots(figsize=s.floats('figsize', (default_width, 7)))
 
-# 2系統 × 2サイド(split) = 4つの半バイオリンがあり、各3本ずつ線がある
-for i, line in enumerate(ax.lines):
-    if i % 3 == 1: # 0,1,2の「1」が中央値
-        line.set_color('red')      # 赤色
-        line.set_linewidth(2.5)    # 太く
-        line.set_linestyle('-')    # 実線に変更
-        line.set_alpha(1.0)
+    sns.violinplot(data=diff_all, x='genotype', y='abs_diff', hue='side', order=order,
+                   split=True, inner='quartile', palette=s.str('palette', 'Set2'), alpha=0.7, ax=ax)
 
-# 個別のドットを追加 (dodge=Trueにすることで左右に分かれたバイオリンに合わせる)
-sns.stripplot(data=diff_all, x='genotype', y='abs_diff', hue='side',
-              dodge=True, color='black', alpha=0.2, jitter=True, size=2, legend=False)
+    # 各半バイオリンに四分位線が3本ずつあり、0,1,2の「1」が中央値
+    for i, line in enumerate(ax.lines):
+        if i % 3 == 1:
+            line.set_color(s.str('median_color', 'red'))
+            line.set_linewidth(s.float('median_linewidth', 2.5))
+            line.set_linestyle('-')
+            line.set_alpha(1.0)
 
-# 5. 線とアスタリスクの描画 (動的な位置決定)
-max_val = diff_all['abs_diff'].max()
-line_y = max_val + 10
-star_y = line_y + 0.5
+    sns.stripplot(data=diff_all, x='genotype', y='abs_diff', hue='side', order=order,
+                  dodge=True, palette='dark:black', alpha=0.2, jitter=True, size=2, legend=False, ax=ax)
 
-# ブラケット横線 (x=0 と x=1)
-ax.plot([0, 0, 1, 1], [line_y, line_y + 1, line_y + 1, line_y], lw=1.5, c='black')
-# アスタリスクテキスト
-ax.text(0.5, star_y, asterisks, ha='center', va='bottom', fontsize=18)
+    # ブラケットとアスタリスク（比較ごとに上へずらす）
+    max_val = diff_all['abs_diff'].max()
+    offset = s.float('bracket_offset', 8)
+    step = s.float('bracket_step', 10)
+    height = s.float('bracket_height', 1)
+    line_y = max_val
+    for n, (i, p_val, asterisks) in enumerate(comparisons):
+        line_y = max_val + offset + step * n
+        ax.plot([0, 0, i, i], [line_y, line_y + height, line_y + height, line_y], lw=1.5, c='black')
+        ax.text(i / 2, line_y + height, asterisks, ha='center', va='bottom',
+                fontsize=s.float('star_fontsize', 16))
 
-plt.title(f'Polarity Magnitude (|L - R|) Comparison\nSplit Violin Plot (Ventral vs Dorsal)(P = {p_val:.2e})')
-plt.ylabel('Absolute Intensity Difference')
-plt.xlabel('Genotype')
-plt.ylim(0, star_y + 5) # 上部に余白を作る
-plt.tight_layout()
-plt.show()
+    s.apply(ax)
+    if s.ylim() is None:
+        ax.set_ylim(0, line_y + s.float('top_margin', 8))
+    legend = ax.get_legend()
+    if legend is not None:
+        legend.set_title(s.str('legend_title', '') or None)
+
+    fig.tight_layout()
+    save_figure(fig, f'{NAME}_{args.dataset}', args, s, NAME)
+    finish(args)
+
+
+if __name__ == '__main__':
+    main()

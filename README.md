@@ -9,12 +9,12 @@ light-intensity-calculator/
 ├── Detectron2/           # 深層学習による馬蹄形検出（メイン）
 ├── Cellpose/             # Cellposeによる馬蹄形検出（検証中）
 ├── horseShoeShapeRecog/  # OpenCVによる従来手法（実験）
-├── heatmap/              # ヒートマップ可視化
-├── stats_figures/        # 統計グラフ（箱ひげ図等）
-├── histogram/            # ヒストグラム処理テスト
-├── gradient/             # グラデーション処理テスト
-├── circle_detection/     # 円検出テスト
-├── arrow_analysis/       # 矢印検出テスト
+├── stats_figures/        # 統計グラフ（箱ひげ図・バイオリン図・ANOVA）
+├── heatmap/              # 馬蹄形の平均輝度ヒートマップ
+├── arrow_analysis/       # 馬蹄形の向き（開口部の方向）の解析
+├── gradient/             # 長方形領域の輝度グラディエント
+├── histogram/            # 明度ヒストグラム・CLAHEの確認
+├── shared/               # 解析フォルダ共通モジュール（設定txt・図の保存・馬蹄形抽出）
 ├── pic/                  # テンプレート画像
 ├── archive/              # 過去の実験コード
 └── ルートファイル         # 従来手法のメインスクリプト
@@ -65,32 +65,37 @@ python Detectron2/inference_heatmaps.py
 
 ---
 
-### heatmap/
-馬蹄形の輝度分布をヒートマップで可視化。Seaborn/matplotlibを使用。
+### 解析・作図フォルダ（stats_figures/, heatmap/, arrow_analysis/, gradient/, histogram/）
 
-| ファイル | 説明 |
-|---------|------|
-| `mosaic_horseshoe.py` | モザイク実験用ヒートマップ（最新） |
-| `horseshoe-heatmaps.py` | 馬蹄形のヒートマップ可視化 |
-| `heatmap.py` | 基本的なヒートマップ生成 |
-| `color-horseshoe-heatmap.py` | 色付きヒートマップ |
+どのフォルダも同じ構成・使い方にそろえてある。詳細は各フォルダの README.md。
 
----
+```
+<フォルダ>/
+├── config/figure_settings.txt   # タイトル・軸ラベル・軸範囲・解析パラメータ（スクリプトごと）
+├── config/image_sets.txt        # 使う画像の一覧（heatmap / arrow_analysis / gradient）
+├── pics/ または data/           # 入力
+├── output/<スクリプト名>/       # 出力（git管理外）
+└── *.py                         # 実行スクリプト（python <スクリプト名> -h で説明）
+```
 
-### stats_figures/
-統計解析用のグラフ生成。Ventral/Dorsal間の比較分析。
+共通オプション: `--no-text`（文字無し版のみ）、`--both`（通常版 + 文字無し版）、`--no-show`（表示せず保存）。
+文字無し版は通常版と同じ範囲で切り出すので、重ねると位置が一致する。
 
-| ファイル | 説明 |
-|---------|------|
-| `boxplot_vd.py` | V-D分岐の箱ひげ図比較（t検定付き） |
-| `process_data.py` | データ前処理・正規化 |
-| `linefig.py` | 線グラフ描画 |
-| `outputfig.py` | 図表出力 |
+| フォルダ | 何用か | 主なスクリプト |
+|---|---|---|
+| [`stats_figures/`](stats_figures/README.md) | 輝度測定結果（txt）のノーマライズと統計グラフ | `parse_intensity.py`, `violin_plot.py`, `twoway_anova.py` など |
+| [`heatmap/`](heatmap/README.md) | 馬蹄形を重ね合わせた平均GFP輝度ヒートマップ | `horseshoe_heatmap.py`, `group_heatmap.py`, `mosaic_compare.py` |
+| [`arrow_analysis/`](arrow_analysis/README.md) | 馬蹄形の開口部の向きの分布・2群比較 | `orientation_polar.py`, `group_comparison_ttest.py` |
+| [`gradient/`](gradient/README.md) | 長方形領域内の輝度グラディエント | `plot_gradient.py`, `make_dummy_gradient.py` |
+| [`histogram/`](histogram/README.md) | 明度ヒストグラムと CLAHE の効果の確認 | `clahe_histogram.py` |
+
+`shared/` はこれらのフォルダが共通で使うモジュール（`settings.py`: 設定txtの読み込み、
+`figure.py`: 保存・文字無し版、`horseshoe.py`: マスクからの馬蹄形抽出・左右分類・画像セット）。
 
 ---
 
 ### horseShoeShapeRecog/
-OpenCVを使用した従来的な画像処理手法。Detectron2導入前の実験コード。
+OpenCVを使用した従来的な画像処理手法。Detectron2導入前の実験コード（[README](horseShoeShapeRecog/README.md)）。
 
 - CLAHE（局所適応ヒストグラム平坦化）
 - 適応的閾値処理
@@ -99,13 +104,8 @@ OpenCVを使用した従来的な画像処理手法。Detectron2導入前の実�
 
 ---
 
-### histogram/, gradient/, circle_detection/, arrow_analysis/
-各種画像処理手法のテスト・実験用フォルダ。
-
----
-
 ### archive/
-過去の実験コード（Keras U-Net, PyTorch U-Net）。Detectron2が主流になったため、参照用として保存。
+過去の実験コード（Keras U-Net, PyTorch U-Net, circle_detection）。Detectron2が主流になったため、参照用として保存。
 
 ---
 
@@ -134,8 +134,8 @@ pip install detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu118
 # 可視化
 pip install matplotlib seaborn
 
-# 機械学習
-pip install scikit-learn pandas numpy scipy
+# 機械学習・統計
+pip install scikit-learn pandas numpy scipy statsmodels scikit-image
 ```
 
 ---
