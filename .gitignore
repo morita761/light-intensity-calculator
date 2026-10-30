@@ -29,3 +29,4 @@ Cellpose/cellpose_dataset/
 screenshot_ocr/rename-*/
 screenshot_ocr/ocr_crops-*/
 screenshot_ocr/*.png
+screenshot_ocr/*.csv
